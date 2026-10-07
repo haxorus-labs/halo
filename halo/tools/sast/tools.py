@@ -5,8 +5,11 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 from agents import RunContextWrapper, function_tool
 
@@ -15,6 +18,7 @@ from halo.sast.enrich import enrich_graph_json
 from halo.sast.findings import STATE_REFUTED, STATE_UNVERIFIED, VALID_STATES, FindingStore
 from halo.sast.gates import adversarial_verify, sanitizer_gate
 from halo.sast.graph import graph_path_for
+from halo.sast.paths import resolve_source_root
 from halo.sast.runners import scan_source
 
 
@@ -47,10 +51,8 @@ def _run_dir() -> Path:
 
 async def _sast_scan_impl(source_path: str) -> dict[str, Any]:
     store = _require_store()
-    root = Path(source_path).expanduser().resolve() if source_path else None
-    if root is None and _default_source_roots:
-        root = Path(_default_source_roots[0]).expanduser().resolve()
-    if root is None or not root.is_dir():
+    root = resolve_source_root(source_path, _default_source_roots)
+    if root is None:
         return {"error": f"source path not found: {source_path or _default_source_roots}"}
 
     candidates = await asyncio.to_thread(scan_source, root)
@@ -83,7 +85,8 @@ async def sast_scan(ctx: RunContextWrapper, source_path: str = "") -> str:
     Args:
         source_path: Absolute path to the local source tree to analyze.
             Defaults to the scanned local source / cloned repository root
-            when omitted.
+            when omitted. Sandbox paths such as ``/workspace/<repo>`` are
+            mapped to the matching host checkout automatically.
     """
     return json.dumps(await _sast_scan_impl(source_path), ensure_ascii=False, default=str)
 

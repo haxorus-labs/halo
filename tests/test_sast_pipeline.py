@@ -8,6 +8,7 @@ from halo.sast.findings import STATE_REFUTED, Finding, FindingStore
 from halo.sast.fingerprint import compute_fingerprint
 from halo.sast.gates import sanitizer_gate
 from halo.sast.graph import build_graph, graph_path_for, query_graph_text
+from halo.sast.paths import resolve_source_root
 from halo.sast.runners import parse_gitleaks, parse_semgrep, parse_trivy
 
 
@@ -160,3 +161,31 @@ def test_build_graph_and_explain(tmp_path):
     assert graph_path_for(run_dir).is_file()
     out = query_graph_text(graph_json, "explain", "main")
     assert "main" in out
+
+
+def test_resolve_source_root_prefers_existing_host_path(tmp_path):
+    src = tmp_path / "repo"
+    src.mkdir()
+    assert resolve_source_root(str(src), []) == src
+    assert resolve_source_root("", [str(src)]) == src
+
+
+def test_resolve_source_root_maps_workspace_path(tmp_path):
+    clone = tmp_path / "halo_repos" / "run1" / "juice-shop"
+    clone.mkdir(parents=True)
+    # sandbox path the agent sees; host checkout is the clone
+    assert resolve_source_root("/workspace/juice-shop", [str(clone)]) == clone
+
+
+def test_resolve_source_root_maps_workspace_subdir(tmp_path):
+    clone = tmp_path / "halo_repos" / "run1" / "juice-shop"
+    (clone / "routes").mkdir(parents=True)
+    assert resolve_source_root("/workspace/juice-shop/routes", [str(clone)]) == clone / "routes"
+    # missing subtree falls back to the repo root
+    assert resolve_source_root("/workspace/juice-shop/nope", [str(clone)]) == clone
+
+
+def test_resolve_source_root_unknown_without_roots():
+    assert resolve_source_root("/workspace/juice-shop", []) is None
+    assert resolve_source_root("", []) is None
+    assert resolve_source_root("/does/not/exist", []) is None

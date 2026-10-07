@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import asyncio
 import json
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 from agents import RunContextWrapper, function_tool
 
 from halo.sast.graph import build_graph, graph_path_for, query_graph_text
+from halo.sast.paths import resolve_source_root
 
 
 _state_dir: Path | None = None
@@ -37,10 +41,8 @@ def _graph_json() -> Path:
 
 
 async def _kg_build_impl(source_path: str) -> dict[str, Any]:
-    root = Path(source_path).expanduser().resolve() if source_path else None
-    if root is None and _default_source_roots:
-        root = Path(_default_source_roots[0]).expanduser().resolve()
-    if root is None or not root.is_dir():
+    root = resolve_source_root(source_path, _default_source_roots)
+    if root is None:
         return {"error": f"source path not found: {source_path or _default_source_roots}"}
     graph_json = await asyncio.to_thread(build_graph, root, _run_dir())
     if graph_json is None:
@@ -58,6 +60,8 @@ async def kg_build(ctx: RunContextWrapper, source_path: str = "") -> str:
     Args:
         source_path: Absolute path to the local source tree. Defaults to the
             scanned local source / cloned repository root when omitted.
+            Sandbox paths such as ``/workspace/<repo>`` are mapped to the
+            matching host checkout automatically.
     """
     return json.dumps(await _kg_build_impl(source_path), ensure_ascii=False, default=str)
 
