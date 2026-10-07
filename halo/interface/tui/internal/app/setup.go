@@ -377,12 +377,12 @@ func (m Model) setupHeaderView(fit setupFit) string {
 }
 
 // banner is the Halo wordmark: block letters with a bevelled edge.
-const banner = ` ███████╗████████╗██████╗ ██╗██╗  ██╗
- ██╔════╝╚══██╔══╝██╔══██╗██║╚██╗██╔╝
- ███████╗   ██║   ██████╔╝██║ ╚███╔╝
- ╚════██║   ██║   ██╔══██╗██║ ██╔██╗
- ███████║   ██║   ██║  ██║██║██╔╝ ██╗
- ╚══════╝   ╚═╝   ╚═╝  ╚═╝╚═╝╚═╝  ╚═╝`
+const banner = `██╗  ██╗ █████╗ ██╗      ██████╗
+██║  ██║██╔══██╗██║     ██╔═══██╗
+███████║███████║██║     ██║   ██║
+██╔══██║██╔══██║██║     ██║   ██║
+██║  ██║██║  ██║███████╗╚██████╔╝
+╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝ ╚═════╝ `
 
 // wordmark renders the banner in solid brand green. Every row is padded out to
 // the full block so centering cannot ripple the letterforms out of alignment.
