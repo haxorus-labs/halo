@@ -1,377 +1,120 @@
-<p align="center">
-  <a href="https://halo.ai/">
-    <img src="https://github.com/usehalo/.github/raw/main/imgs/cover.png" alt="Halo Banner" width="100%">
-  </a>
-</p>
-
-<div align="center">
-
 # Halo
 
-### The open-source AI pentesting tool. Autonomous AI hackers that find and fix your app’s vulnerabilities.
+Halo is an open-source, autonomous AI pentesting tool. AI agents run your
+code dynamically, probe it for vulnerabilities, and validate findings with
+real proofs of concept inside a Docker sandbox.
 
-<br/>
+On top of the classic runtime scan it ships a whitebox static analysis
+pipeline driven by a code knowledge graph (tree-sitter → graphify) plus
+semgrep/gitleaks/trivy, with fingerprint dedupe, a sanitizer gate, and an
+LLM adversarial verifier.
 
+## Layout
 
-<a href="https://docs.halo.ai"><img src="https://img.shields.io/badge/Docs-docs.halo.ai-2b9246?style=for-the-badge&logo=gitbook&logoColor=white" alt="Docs"></a>
-<a href="https://halo.ai"><img src="https://img.shields.io/badge/Website-halo.ai-f0f0f0?style=for-the-badge&logoColor=000000" alt="Website"></a>
-[![](https://dcbadge.limes.pink/api/server/halo-ai)](https://discord.gg/halo-ai)
+```
+halo/
+  agents/        agent graph + prompts (Jinja system prompt, skills)
+  tools/         agent tools: shell, browser, proxy, sast/, kg/, reporting, ...
+  sast/          static analysis pipeline (fingerprint, findings store,
+                 semgrep/gitleaks/trivy runners, gates, graphify bridge)
+  runtime/       Docker sandbox lifecycle
+  config/        settings (env aliases), LiteLLM provider wiring
+  core/          agent loop, sessions, budget hooks
+  report/        findings state, SARIF, dedupe, usage/pricing
+  skills/        internal markdown knowledge packs the agents load
+  interface/     CLI, TUI (Bubble Tea), local web viewer
+containers/      Kali-based sandbox image (semgrep, nuclei, nmap, ...)
+tests/           pytest suite
+```
 
-<a href="https://app.halo.ai?utm_source=github&utm_medium=readme&utm_content=badge_cloud"><img src="https://img.shields.io/badge/Halo%20Cloud-app.halo.ai-2b9246?style=for-the-badge&logoColor=white" alt="Halo Cloud"></a>
-<a href="https://halo.ai/demo?utm_source=github&utm_medium=readme&utm_content=badge_demo"><img src="https://img.shields.io/badge/Try%20Halo%20Enterprise-555555?style=for-the-badge&logoColor=white" alt="Try Halo Enterprise"></a>
+## Prerequisites
 
-<a href="https://github.com/usehalo/halo"><img src="https://img.shields.io/github/stars/usehalo/halo?style=flat-square" alt="GitHub Stars"></a>
-<a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-3b82f6?style=flat-square" alt="License"></a>
-<a href="https://pypi.org/project/halo-agent/"><img src="https://img.shields.io/pypi/v/halo-agent?style=flat-square" alt="PyPI Version"></a>
+- Python 3.12+, `uv`
+- Docker running
+- An LLM API key (any LiteLLM-compatible provider)
+- Go (only for the interactive TUI; headless use does not need it)
 
-
-<a href="https://discord.gg/halo-ai"><img src="https://github.com/usehalo/.github/raw/main/imgs/Discord.png" height="40" alt="Join Discord"></a>
-<a href="https://x.com/halo_ai"><img src="https://github.com/usehalo/.github/raw/main/imgs/X.png" height="40" alt="Follow on X"></a>
-
-
-<a href="https://trendshift.io/repositories/15362?utm_source=trendshift-badge&amp;utm_medium=badge&amp;utm_campaign=badge-trendshift-15362" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/15362/weekly" alt="usehalo%2Fhalo | Trendshift" width="250" height="55"/></a>
-<a href="https://trendshift.io/repositories/15362" target="_blank"><img src="https://trendshift.io/api/badge/repositories/15362" alt="usehalo/halo | Trendshift" width="250" height="55"/></a>
-
-</div>
-
-
-> [!TIP]
-> **New!** Halo integrates seamlessly with GitHub Actions and CI/CD pipelines. Automatically scan for vulnerabilities on every pull request and block insecure code before it reaches production - [Get started with no setup required](https://app.halo.ai?utm_source=github&utm_medium=readme&utm_content=tip_ci).
-
----
-
-
-## Halo Overview
-
-Halo are autonomous AI penetration testing agents that act just like real hackers - they run your code dynamically, find vulnerabilities, and validate them through actual proofs-of-concept. Built for developers and security teams who need fast, accurate security testing without the overhead of manual pentesting or the false positives of static analysis tools.
-
-**Key Capabilities:**
-
-- **Full pentesting toolkit** - reconnaissance, exploitation, and validation out of the box
-- **Multi-agent orchestration** - teams of AI pentesters that collaborate and scale
-- **Real exploit validation** - working PoCs, not false positives like legacy vulnerability scanners
-- **Developer‑first CLI** - actionable findings with remediation guidance
-- **Auto‑fix & reporting** - generate patches and compliance-ready pentest reports
-
-
-<br>
-
-
-<div align="center">
-  <a href="https://halo.ai">
-    <img src=".github/screenshot.png" alt="Halo Demo" width="1000" style="border-radius: 16px;">
-  </a>
-</div>
-
-
-## Use Cases
-
-- **Application Security Testing** - Detect and validate critical vulnerabilities in your applications
-- **Rapid Penetration Testing** - Get penetration tests done in hours, not weeks, with compliance reports
-- **Bug Bounty Automation** - Automate bug bounty research and generate PoCs for faster reporting
-- **CI/CD Integration** - Run tests in CI/CD to block vulnerabilities before reaching production
-
-## 🚀 Quick Start
-
-**Prerequisites:**
-- Docker (running)
-- An LLM API key from any [supported provider](https://docs.halo.ai/llm-providers/overview) (OpenAI, Anthropic, Google, etc.)
-
-### Installation & First Scan
+## Install
 
 ```bash
-# Install Halo
-curl -sSL https://halo.ai/install | bash
+make dev-install          # create the uv venv with dev deps
 
-# Configure your AI provider
-export HALO_LLM="openrouter/z-ai/glm-5.3"
-export LLM_API_KEY="your-api-key"
-
-# Run your first security assessment
-halo --target ./app-directory
+# sandbox image (the registry image is private; build locally)
+docker build -t halo-sandbox:local -f containers/Dockerfile .
 ```
 
-> [!NOTE]
-> First run automatically pulls the sandbox Docker image. Results are saved to `halo_runs/<run-name>`
+## Configure
 
----
-
-## Ways to Run Halo
-
-- **Open Source** - free, runs locally with Docker and your own LLM key. [Quick Start](https://docs.halo.ai/quickstart)
-- **Halo Cloud** - no setup, validated findings, one-click autofix, and PR reviews. [Run a pentest →](https://app.halo.ai?intent=pentest&utm_source=github&utm_medium=readme&utm_content=table_cloud)
-- **Enterprise** - SSO, compliance-ready reports, VPC or self-hosted deployment. [Try Halo Enterprise →](https://halo.ai/demo?utm_source=github&utm_medium=readme&utm_content=table_demo)
-
----
-
-## ☁️ Halo Cloud
-
-Try the Halo full-stack penetration testing platform at **[app.halo.ai](https://app.halo.ai?utm_source=github&utm_medium=readme&utm_content=cloud_heading)** - sign up for free, connect your repos and domains, and launch a pentest in minutes.
-
-- **Validated findings with PoCs** - every vulnerability includes a working proof-of-concept exploit and reproduction steps
-- **One-click autofix** - AI-generated security patches as ready-to-merge pull requests
-- **Continuous pentesting** - always-on vulnerability scanning that keeps pace with your deployments
-- **DevSecOps integrations** - GitHub, GitLab, Bitbucket, Slack, Jira, Linear, and CI/CD pipelines
-- **Continuous learning** - AI that builds on past findings, adapts to your codebase, and reduces false positives over time
-
-[**Run a pentest →**](https://app.halo.ai?intent=pentest&utm_source=github&utm_medium=readme&utm_content=cloud_cta)
-
-## 🏢 Enterprise
-
-Get the same Halo experience with enterprise-grade controls: SSO (SAML/OIDC), custom compliance-ready penetration testing reports (SOC 2, ISO 27001, PCI DSS), dedicated support and SLA, custom deployment options (VPC or self-hosted), BYOK model support, and tailored AI pentesting agents optimized for your environment.
-
-[**Try Halo Enterprise →**](https://halo.ai/demo?utm_source=github&utm_medium=readme&utm_content=enterprise_cta)
-
----
-
-## 🤖 Use Halo from Your Coding Agent
-
-Halo is agent-ready. Give Claude Code, Cursor, Codex, or any [SKILL.md-compatible](https://agentskills.io) agent the ability to run pentests, fix findings, and set up CI scanning:
-
-```bash
-npx skills add usehalo/halo
-```
-
-This installs nine skills for running pentests, fixing findings, and CI scanning, against code, web apps, APIs, and the OWASP Top 10. Agents can use the local CLI or the managed cloud with the same engine.
-
-See [`AGENTS.md`](AGENTS.md) for the quick reference, [docs.halo.ai/llms.txt](https://docs.halo.ai/llms.txt) for the CLI, and [docs.app.halo.ai](https://docs.app.halo.ai) for the API.
-
----
-
-## ✨ Features
-
-### Agentic Pentesting Tools
-
-Halo agents come equipped with a comprehensive offensive security toolkit - the same tools used by professional penetration testers and ethical hackers:
-
-- **HTTP Interception Proxy** - Full request/response manipulation and analysis with Caido
-- **Browser Exploitation** - Automated browser for testing XSS, CSRF, clickjacking, and auth bypass flows
-- **Shell & Command Execution** - Interactive terminal for exploit development and post-exploitation
-- **Custom Exploit Runtime** - Python sandbox for writing and validating proof-of-concept exploits
-- **Reconnaissance & OSINT** - Automated attack surface mapping, subdomain enumeration, and fingerprinting
-- **Static & Dynamic Code Analysis** - SAST + DAST capabilities for comprehensive application security testing
-- **Vulnerability Knowledge Base** - Structured findings with CVSS scoring and OWASP classification
-
-### Comprehensive Vulnerability Scanner
-
-Halo identifies, validates, and exploits a wide range of security vulnerabilities across the OWASP Top 10 and beyond:
-
-- **Broken Access Control** - IDOR, privilege escalation, auth bypass
-- **Injection Attacks** - SQL injection, NoSQL injection, OS command injection, SSTI
-- **Server-Side Vulnerabilities** - SSRF, XXE, insecure deserialization, RCE
-- **Client-Side Attacks** - XSS (stored/reflected/DOM), prototype pollution, CSRF
-- **Business Logic Flaws** - Race conditions, payment manipulation, workflow bypass
-- **Authentication & Session** - JWT attacks, session fixation, credential stuffing vectors
-- **Infrastructure & Cloud** - Misconfigurations, exposed services, cloud security issues
-- **API Security** - Broken authentication, mass assignment, rate limiting bypass
-
-### Graph of Agents (Multi-Agent Pentesting)
-
-Advanced multi-agent orchestration for comprehensive automated penetration testing:
-
-- **Distributed Pentesting** - Specialized AI agents for recon, exploitation, and post-exploitation
-- **Scalable Security Testing** - Parallel execution across multiple targets for fast, comprehensive coverage
-- **Dynamic Coordination** - Agents share discoveries, chain vulnerabilities, and collaborate like a red team
-
----
-
-## 🖥️ Local Web Viewer
-
-Every scan writes its results to disk as it runs. Bring them up in a local dashboard with a single command:
-
-```bash
-# Open the most recent run
-halo view
-
-# ...or open a specific run by name
-halo view my-run-name
-
-# Expose the viewer on all IPv4 interfaces at a fixed port
-halo view --host 0.0.0.0 --port 8080 --no-open
-```
-
-The dashboard shows the findings, a live map of the agent team, and past runs. Nothing leaves your machine, and the UI ships prebuilt. `halo view` binds to `127.0.0.1` and prints a tokened link that grants access to the run, so share it carefully.
-
-See the [viewer documentation](https://docs.halo.ai/usage/viewer) for the options and for reaching the viewer from another machine.
-
----
-
-## Usage Examples
-
-### Basic Usage
-
-```bash
-# Scan a local codebase
-halo --target ./app-directory
-
-# Security review of a GitHub repository
-halo --target https://github.com/org/repo
-
-# Black-box web application assessment
-halo --target https://your-app.com
-```
-
-### API Testing (OpenAPI / Swagger / Postman)
-
-Point Halo at an API contract and it tests every declared endpoint instead of
-having to discover them by crawling. Pair the spec with the live base URL so the
-agent knows where to send traffic:
-
-```bash
-# OpenAPI / Swagger file, Postman export, or a live collection by id
-halo --target ./openapi.yaml --target https://api.your-app.com
-halo --target postman://<collection-uuid> --target https://api.your-app.com
-```
-
-
-### Advanced Testing Scenarios
-
-```bash
-# Grey-box authenticated testing
-halo --target https://your-app.com --instruction "Perform authenticated testing using credentials: user:pass"
-
-# Multi-target testing (source code + deployed app)
-halo -t https://github.com/org/app -t https://your-app.com
-
-# Targets from a file, one target per non-empty, non-comment line
-halo --target-list ./targets.txt
-```
-
-See the [CLI reference](https://docs.halo.ai/usage/cli) for every option, including scan modes, diff scope, instruction files, and budgets.
-
-### Headless Mode
-
-Run Halo programmatically without interactive UI using the `-n/--non-interactive` flag - perfect for servers and automated jobs. The CLI prints real-time vulnerability findings and the final report before exiting. Exits with non-zero code when vulnerabilities are found.
-
-```bash
-halo -n --target https://your-app.com
-```
-
-### CI/CD (GitHub Actions)
-
-Halo can be added to your pipeline to run a security test on pull requests with a lightweight GitHub Actions workflow:
-
-```yaml
-name: halo-penetration-test
-
-on:
-  pull_request:
-
-jobs:
-  security-scan:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Install Halo
-        run: curl -sSL https://halo.ai/install | bash
-
-      - name: Run Halo
-        env:
-          HALO_LLM: ${{ secrets.HALO_LLM }}
-          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-
-        run: halo -n -t ./ --scan-mode quick
-```
-
-> [!TIP]
-> In CI pull request runs, Halo automatically scopes quick reviews to changed files, which is why the
-> checkout above fetches full history. See the
-> [CI/CD documentation](https://docs.halo.ai/integrations/github-actions) for the details.
-
-### Configuration
-
-```bash
-export HALO_LLM="openrouter/z-ai/glm-5.3"
-export LLM_API_KEY="your-api-key"
-
-# Optional
-export LLM_API_BASE="your-api-base-url"  # if using a local model, e.g. Ollama, LMStudio
-```
-
-> [!NOTE]
-> Halo automatically saves your configuration to `~/.halo/cli-config.json`, so you don't have to re-enter it on every run.
-> See the [configuration reference](https://docs.halo.ai/advanced/configuration) for every environment variable.
-
-#### Sign in with a ChatGPT subscription
-
-Instead of a metered API key, you can run Halo on your ChatGPT Plus/Pro subscription:
-
-```bash
-halo auth login chatgpt             # sign in with your ChatGPT account
-export HALO_LLM="chatgpt/gpt-5.4"   # chatgpt/<model> runs on the subscription
-halo auth status                    # show the active sign-in, or logout to forget it
-```
-
-#### Use the managed platform: `halo cloud`
-
-Run scans on [app.halo.ai](https://app.halo.ai) from the terminal, without Docker or an LLM key:
-
-```bash
-halo cloud login                                  # browser sign-in, one credential per install
-halo cloud scans start --source . --yes --wait    # scan local code, approving the upload
-halo cloud scans start --engagement-type live_test --domain-ids <uuid> --wait
-halo cloud vulns list --severity critical
-```
-
-Every [REST API](https://docs.app.halo.ai) operation has a matching `halo cloud <resource> <verb>` command. Run `halo cloud` to list the resources, and add `help` to a resource to list its verbs. Output is JSON when stdout is not a terminal or when you pass `--json`. Binary downloads are the exception: redirect the raw bytes, or combine `--output FILE --json` for download metadata.
-
-See the [cloud CLI documentation](https://docs.halo.ai/cloud/cli) for scopes, workspaces, billing, and source-upload options.
-
-#### Connect your own MCP servers
-
-Halo can connect to Model Context Protocol (MCP) servers you list and expose their tools to the agent during a run. Create `~/.halo/mcp-servers.json` with a JSON list of local `stdio` servers or remote `http` servers:
+Persisted in `~/.halo/cli-config.json` (env always wins over the file):
 
 ```json
-[
-  {
-    "name": "github",
-    "transport": "http",
-    "url": "https://api.githubcopilot.com/mcp/",
-    "auth": { "kind": "bearer", "token": "your-token" },
-    "allowed_tools": ["list_issues"]
+{
+  "env": {
+    "HALO_IMAGE": "halo-sandbox:local",
+    "HALO_LLM": "nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b",
+    "LLM_API_KEY": "<key>"
   }
-]
+}
 ```
 
-Each server's tools are namespaced by `name`, for example `github_list_issues`. See the [MCP documentation](https://docs.halo.ai/integrations/mcp) for the full schema, tool filtering, and `stdio` servers.
+Or export in your shell:
 
-**Recommended models for best results:**
+```bash
+export HALO_LLM="openrouter/z-ai/glm-5.3"   # any LiteLLM model id
+export LLM_API_KEY="<key>"
+export LLM_API_BASE="<url>"                  # only for OpenAI-compatible endpoints
+export HALO_IMAGE="halo-sandbox:local"
+```
 
-- [Z.ai GLM-5.3 on OpenRouter](https://openrouter.ai/z-ai/glm-5.3) - `openrouter/z-ai/glm-5.3` (the default pick)
-- [OpenAI GPT-5.4](https://openai.com/api/) - `openai/gpt-5.4`
-- [Anthropic Claude Sonnet 4.6](https://claude.com/platform/api) - `anthropic/claude-sonnet-4-6`
-- [Google Gemini 3 Pro Preview](https://cloud.google.com/vertex-ai) - `vertex_ai/gemini-3-pro-preview`
-- [DeepSeek V4 Pro](https://platform.deepseek.com) - `deepseek/deepseek-v4-pro`
-- [Moonshot Kimi K3](https://platform.kimi.ai) - `moonshot/kimi-k3`
+## Run
 
-See the [LLM Providers documentation](https://docs.halo.ai/llm-providers/overview) for all supported providers including Vertex AI, Bedrock, Azure, and local models.
+```bash
+# interactive TUI (requires Go on PATH)
+uv run halo -t <target>
 
-## Documentation
+# headless
+uv run halo -n -t <target> --scan-mode quick --max-budget 10
 
-Full documentation is available at **[docs.halo.ai](https://docs.halo.ai)** - including detailed guides for usage, CI/CD integrations, skills, and advanced configuration.
+# local source tree (whitebox: SAST + KG tools enabled)
+uv run halo -n -t ./my-app --scan-mode quick --max-budget 10
 
-## Contributing
+# GitHub repo (cloned automatically, also whitebox)
+uv run halo -n -t https://github.com/org/repo --scan-mode quick
+```
 
-We welcome contributions of code, docs, and new skills - check out our [Contributing Guide](https://docs.halo.ai/contributing) to get started or open a [pull request](https://github.com/usehalo/halo/pulls)/[issue](https://github.com/usehalo/halo/issues).
+Headless exit codes: `0` clean, `1` fatal error, `2` vulnerabilities found.
+Artifacts in `halo_runs/<run>/` (report, `vulnerabilities.json`, SARIF,
+`run.json`). Live web replay of a run: `uv run halo view`.
 
-## Join Our Community
+## SAST pipeline + knowledge graph
 
-Have questions? Found a bug? Want to contribute? **[Join our Discord!](https://discord.gg/halo-ai)**
+Enabled automatically for whitebox targets (`--target` on a local source
+tree or a GitHub repo), gated by `HALO_SAST_ENABLED` (default on):
 
-## Support the Project
+1. `kg_build(source_path=...)` — tree-sitter parse of the target into a
+   graphify knowledge graph (`halo_runs/<run>/graphify-out/graph.json`).
+2. `sast_scan(source_path=...)` — semgrep/gitleaks/trivy, normalized,
+   fingerprinted (`sha1(file+sink+slice+taxonomy)`), deduped into
+   `findings.jsonl`, and injected into the graph as finding nodes.
+3. `finding_verify(finding_id=..., source_slice=...)` — syntactic sanitizer
+   gate, then one adversarial LLM call; findings end up
+   `PROPOSED / VERIFIED / REFUTED / UNVERIFIED`.
+4. `finding_state(...)` — manual verdicts.
+5. `kg_query` / `kg_path` / `kg_explain` — pull targeted code slices from
+   the graph instead of reading whole files.
 
-**Love Halo?** Give us a ⭐ on GitHub!
+## Development
 
-## Acknowledgements
+```bash
+make check-all          # ruff + mypy + pyright + bandit
+uv run pytest           # test suite
+cd halo/interface/tui && PATH="$HOME/.local/go/bin:$PATH" go build ./cmd/halo-tui   # TUI sidecar
+```
 
-Halo builds on the incredible work of open-source projects like [LiteLLM](https://github.com/BerriAI/litellm), [Caido](https://github.com/caido/caido), [Nuclei](https://github.com/projectdiscovery/nuclei), [Playwright](https://github.com/microsoft/playwright), and [Bubble Tea](https://github.com/charmbracelet/bubbletea). Huge thanks to their maintainers!
+## Use responsibly
 
+Only scan targets you own or are explicitly authorized to assess.
 
-> [!WARNING]
-> **Authorized use only.** Halo actively tests the targets you point it at, so only run it against systems you own or have **explicit, written permission** to test, and stay within the agreed scope. Unauthorized testing is illegal in most jurisdictions.
-> You alone are responsible for obtaining authorization and complying with the law. Halo is provided "as is" with no warranty or liability for misuse.
+## License
 
-</div>
+Apache 2.0 — see [LICENSE](LICENSE).
