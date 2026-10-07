@@ -107,6 +107,13 @@ Findings carry a curated taxonomy id (`halo/sast/taxonomy/*.yaml`: guard
 patterns, severity, mutant payloads per rule family). Recipe ids are stable —
 never rename one, since they are hashed into finding fingerprints.
 
+Authorization mapping (for IDOR / broken access control): `kg_auth_personas`
+lists seeded login personas (`halo/sast/fixtures/*.yaml`); record what each
+persona observes per route with `kg_auth_record(route, persona, status)`
+(2xx → allows edge, 401/403 → denies edge), then ask `kg_authmap(route)`
+who can reach it or `kg_unguarded()` for the anon-reachable surface. Only
+measured probes count — never guess access from source.
+
 ## Development
 
 ```bash

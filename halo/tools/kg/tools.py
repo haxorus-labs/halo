@@ -12,6 +12,14 @@ if TYPE_CHECKING:
 
 from agents import RunContextWrapper, function_tool
 
+from halo.sast.authmap import (
+    auth_for_route,
+    normalize_route,
+    record_auth_probes,
+    unguarded_routes,
+    verdict_for_status,
+)
+from halo.sast.fixtures import login_body_for, match_fixture
 from halo.sast.graph import build_graph, graph_path_for, query_graph_text
 from halo.sast.paths import resolve_source_root
 
@@ -95,3 +103,123 @@ async def kg_explain(ctx: RunContextWrapper, node: str) -> str:
         node: Node label to explain.
     """
     return await asyncio.to_thread(query_graph_text, _graph_json(), "explain", node)
+
+
+def _read_graph() -> dict[str, Any]:
+    path = _graph_json()
+    if not path.is_file():
+        return {"nodes": [], "edges": []}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"nodes": [], "edges": []}
+    return data if isinstance(data, dict) else {"nodes": [], "edges": []}
+
+
+@function_tool(timeout=120)
+async def kg_auth_personas(ctx: RunContextWrapper, repo_url: str = "") -> str:
+    """List seeded login personas for the target (anon + known users/roles).
+
+    Returns each persona's login route, request body template, and role so
+    probed routes can be recorded with ``kg_auth_record``. Matches a fixture
+    by repo URL, else by the scanned source root.
+
+    Args:
+        repo_url: Repository URL to match a fixture (optional when the scan
+            target already identifies the source).
+    """
+    return json.dumps(await _kg_auth_personas_impl(repo_url), ensure_ascii=False, default=str)
+
+
+async def _kg_auth_personas_impl(repo_url: str) -> dict[str, Any]:
+    source = repo_url.strip() or (resolve_source_root("", _default_source_roots) or "")
+    fixture = match_fixture(repo_url=repo_url, source_path=str(source))
+    if fixture is None:
+        return {"personas": [], "hint": "no fixture matched; probe manually"}
+    return {
+        "fixture": fixture.id,
+        "login": {
+            "route": fixture.login_route,
+            "method": fixture.login_method,
+            "token_path": fixture.token_path,
+        },
+        "personas": [
+            {
+                "id": p.id,
+                "role": p.role,
+                "body": login_body_for(fixture, p),
+            }
+            for p in fixture.personas
+        ],
+        "denied_statuses": list(fixture.denied_statuses),
+        "notes": fixture.notes,
+    }
+
+
+@function_tool(timeout=120)
+async def kg_auth_record(
+    ctx: RunContextWrapper, route: str, persona: str, status: int, evidence: str = ""
+) -> str:
+    """Record one measured authorization probe in the knowledge graph.
+
+    Log in (or not) as ``persona``, request ``route``, and store the observed
+    HTTP ``status`` as an allows/denies edge. Non-allow/deny statuses are
+    reported as inconclusive without writing an edge.
+
+    Args:
+        route: Probed route path or URL.
+        persona: Persona id from ``kg_auth_personas`` (e.g. anon, customer, admin).
+        status: Observed HTTP status code.
+        evidence: Optional note (e.g. redirect target, body marker).
+    """
+    return json.dumps(await _kg_auth_record_impl(route, persona, status, evidence))
+
+
+async def _kg_auth_record_impl(
+    route: str, persona: str, status: int, evidence: str = ""
+) -> dict[str, Any]:
+    verdict = verdict_for_status(status)
+    if verdict == "inconclusive":
+        return {"route": normalize_route(route), "persona": persona, "verdict": verdict}
+    record_auth_probes(
+        _graph_json(),
+        [
+            {
+                "route": route,
+                "persona": persona,
+                "verdict": verdict,
+                "evidence": evidence,
+            }
+        ],
+    )
+    return {
+        "route": normalize_route(route),
+        "persona": persona,
+        "status": status,
+        "verdict": verdict,
+    }
+
+
+@function_tool(timeout=120)
+async def kg_authmap(ctx: RunContextWrapper, route: str) -> str:
+    """Who can reach a route, per recorded probes (allows/denies by persona).
+
+    Args:
+        route: Route path or URL to look up.
+    """
+    return json.dumps(await _kg_authmap_impl(route), ensure_ascii=False)
+
+
+@function_tool(timeout=120)
+async def kg_unguarded(ctx: RunContextWrapper) -> str:
+    """Routes with a recorded anon allows edge (publicly reachable surface)."""
+    return json.dumps(await _kg_unguarded_impl(), ensure_ascii=False)
+
+
+async def _kg_authmap_impl(route: str) -> dict[str, Any]:
+    result = auth_for_route(_read_graph(), route)
+    return {"route": normalize_route(route), **result}
+
+
+async def _kg_unguarded_impl() -> dict[str, Any]:
+    return {"unguarded": unguarded_routes(_read_graph())}

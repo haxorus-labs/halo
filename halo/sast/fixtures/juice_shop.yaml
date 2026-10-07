@@ -1,0 +1,36 @@
+id: juice-shop
+version: 1
+title: OWASP Juice Shop seeded personas
+match:
+  repo_urls:
+    - "*juice-shop/juice-shop*"
+  path_markers:
+    - "juice-shop"
+login:
+  route: /rest/user/login
+  method: POST
+  body:
+    email: "{email}"
+    password: "{password}"
+  token_path: authentication.token
+  success_markers:
+    - "authentication"
+personas:
+  - id: anon
+    role: anonymous
+  - id: customer
+    role: customer
+    email: jim@juice-sh.op
+    password: ncc-1701
+  - id: admin
+    role: admin
+    email: admin@juice-sh.op
+    password: admin123
+auth_signals:
+  denied_statuses: [401, 403]
+  notes: >
+    401 means unauthenticated, 403 means authenticated but forbidden. Login
+    is POST /rest/user/login with {email, password}; the response carries
+    authentication.token. Emails are <name>@<application.domain>
+    (default domain juice-sh.op).
+evidence: []

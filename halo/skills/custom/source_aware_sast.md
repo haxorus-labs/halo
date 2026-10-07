@@ -21,6 +21,12 @@ hand-rolling this playbook:
 4. `finding_state(...)` — record manual verdicts.
 5. `kg_query` / `kg_path` / `kg_explain` — pull targeted slices instead of
    reading whole files; this is how you preserve token budget.
+6. Authorization mapping (for IDOR / broken access control): `kg_auth_personas`
+   lists seeded login personas, then for each interesting route record what
+   each persona observes with `kg_auth_record(route, persona, status)` —
+   2xx writes an allows edge, 401/403 a denies edge. Query with
+   `kg_authmap(route)` ("who can reach this?") and `kg_unguarded()` (routes
+   anon can reach). Never guess access from source; only recorded probes count.
 
 Only fall back to the manual commands below when you need raw artifacts.
 

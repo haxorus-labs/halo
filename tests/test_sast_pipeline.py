@@ -1,16 +1,26 @@
+import asyncio
 import json
 import shutil
 
 import pytest
 
+from halo.sast.authmap import (
+    auth_for_route,
+    normalize_route,
+    record_auth_probes,
+    unguarded_routes,
+    verdict_for_status,
+)
 from halo.sast.enrich import enrich_graph_json
 from halo.sast.findings import STATE_REFUTED, Finding, FindingStore
 from halo.sast.fingerprint import compute_fingerprint
+from halo.sast.fixtures import load_fixtures, login_body_for, match_fixture
 from halo.sast.gates import sanitizer_gate
 from halo.sast.graph import build_graph, graph_path_for, query_graph_text
 from halo.sast.paths import resolve_source_root
 from halo.sast.runners import parse_gitleaks, parse_semgrep, parse_trivy
 from halo.sast.taxonomy import load_recipes, match_recipe, recipe_for_finding
+from halo.tools.kg import tools as kg_tools
 
 
 def test_fingerprint_is_deterministic():
@@ -263,3 +273,85 @@ def test_recipe_for_finding_prefers_stored_id():
     recipe = recipe_for_finding(findings[0])
     assert recipe is not None
     assert recipe.id == "secret-api-key"
+
+
+def test_fixture_pack_loads_and_matches_juice_shop(tmp_path):
+    fixtures = load_fixtures()
+    assert {f.id for f in fixtures} == {"juice-shop"}
+    by_url = match_fixture(repo_url="https://github.com/juice-shop/juice-shop")
+    assert by_url is not None
+    assert by_url.id == "juice-shop"
+    by_path = match_fixture(source_path=str(tmp_path / "halo_repos" / "run1" / "juice-shop"))
+    assert by_path is not None
+    assert by_path.id == "juice-shop"
+    assert match_fixture(repo_url="https://github.com/other/app") is None
+    admin = next(p for p in by_url.personas if p.id == "admin")
+    assert admin.role == "admin"
+    body = login_body_for(by_url, admin)
+    assert body == {"email": "admin@juice-sh.op", "password": "admin123"}
+    anon = next(p for p in by_url.personas if p.id == "anon")
+    assert login_body_for(by_url, anon) == {}
+
+
+def test_authmap_record_query_unguarded(tmp_path):
+    assert verdict_for_status(200) == "allows"
+    assert verdict_for_status(401) == "denies"
+    assert verdict_for_status(403) == "denies"
+    assert verdict_for_status(500) == "inconclusive"
+    assert verdict_for_status(302) == "inconclusive"
+    assert normalize_route("https://host/api/x?y=1") == "/api/x"
+    assert normalize_route("api/x") == "/api/x"
+
+    graph = tmp_path / "graph.json"
+    graph.write_text(json.dumps({"nodes": [], "edges": []}))
+    record_auth_probes(
+        graph,
+        [
+            {"route": "/rest/admin", "persona": "anon", "verdict": "denies"},
+            {"route": "/rest/admin", "persona": "admin", "verdict": "allows"},
+            {"route": "/", "persona": "anon", "verdict": "allows"},
+            {"route": "/rest/admin", "persona": "admin", "verdict": "allows"},
+            {"route": "/x", "persona": "anon", "verdict": "inconclusive"},
+        ],
+    )
+    data = json.loads(graph.read_text())
+    assert auth_for_route(data, "/rest/admin") == {
+        "allows": ["admin"],
+        "denies": ["anon"],
+    }
+    assert auth_for_route(data, "/never-probed") == {"allows": [], "denies": []}
+    assert unguarded_routes(data) == ["/"]
+
+
+def test_kg_auth_tools_roundtrip(tmp_path):
+    state = tmp_path / ".state"
+    state.mkdir()
+    kg_tools.hydrate_kg_from_disk(state)
+    try:
+        personas = asyncio.run(
+            kg_tools._kg_auth_personas_impl("https://github.com/juice-shop/juice-shop")
+        )
+        assert personas["fixture"] == "juice-shop"
+        assert {p["id"] for p in personas["personas"]} == {"anon", "customer", "admin"}
+
+        rec = asyncio.run(kg_tools._kg_auth_record_impl("https://t/rest/admin/users", "anon", 401))
+        assert rec["verdict"] == "denies"
+        rec = asyncio.run(kg_tools._kg_auth_record_impl("/rest/admin/users", "admin", 200))
+        assert rec["verdict"] == "allows"
+        rec = asyncio.run(kg_tools._kg_auth_record_impl("/flaky", "anon", 500))
+        assert rec["verdict"] == "inconclusive"
+
+        looked = asyncio.run(kg_tools._kg_authmap_impl("/rest/admin/users"))
+        assert looked == {
+            "route": "/rest/admin/users",
+            "allows": ["admin"],
+            "denies": ["anon"],
+        }
+        unguarded = asyncio.run(kg_tools._kg_unguarded_impl())
+        assert unguarded == {"unguarded": []}
+
+        graph = json.loads((state.parent / "graphify-out" / "graph.json").read_text())
+        assert any(n.get("type") == "actor" for n in graph["nodes"])
+        assert any(n.get("type") == "route" for n in graph["nodes"])
+    finally:
+        kg_tools.hydrate_kg_from_disk.__globals__["_state_dir"] = None

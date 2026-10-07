@@ -284,7 +284,17 @@ async def run_halo_scan(
     hydrate_threat_models_from_disk(state_dir)
 
     from halo.config import load_settings as _load_settings
-    from halo.tools.kg.tools import hydrate_kg_from_disk, kg_build, kg_explain, kg_path, kg_query
+    from halo.tools.kg.tools import (
+        hydrate_kg_from_disk,
+        kg_auth_personas,
+        kg_auth_record,
+        kg_authmap,
+        kg_build,
+        kg_explain,
+        kg_path,
+        kg_query,
+        kg_unguarded,
+    )
     from halo.tools.sast.tools import (
         finding_state,
         finding_verify,
@@ -380,7 +390,17 @@ async def run_halo_scan(
             from halo.agents.factory import register_agent_tools
 
             register_agent_tools(
-                sast_scan, finding_verify, finding_state, kg_build, kg_query, kg_path, kg_explain
+                sast_scan,
+                finding_verify,
+                finding_state,
+                kg_build,
+                kg_query,
+                kg_path,
+                kg_explain,
+                kg_auth_personas,
+                kg_auth_record,
+                kg_authmap,
+                kg_unguarded,
             )
             from halo.tools.kg.tools import set_default_source_roots as _set_kg_roots
             from halo.tools.sast.tools import set_default_source_roots as _set_sast_roots
