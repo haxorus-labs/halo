@@ -1,22 +1,22 @@
 ---
 title: "Local Web Viewer"
-description: "Browse a run in a local dashboard with strix view"
+description: "Browse a run in a local dashboard with halo view"
 ---
 
-Every scan writes its results to disk as it runs. `strix view` serves those files in a local dashboard, for a live run or a finished one.
+Every scan writes its results to disk as it runs. `halo view` serves those files in a local dashboard, for a live run or a finished one.
 
 ```bash
-strix view                                    # the most recent run
-strix view my-run-name                        # a specific run under ./strix_runs
-strix view --host 0.0.0.0 --port 8080 --no-open
+halo view                                    # the most recent run
+halo view my-run-name                        # a specific run under ./halo_runs
+halo view --host 0.0.0.0 --port 8080 --no-open
 ```
 
-The UI ships prebuilt with Strix, so there is no extra install and no JavaScript build step. The dashboard reads the run files straight off disk. Nothing leaves your machine, and you do not need a cloud account.
+The UI ships prebuilt with Halo, so there is no extra install and no JavaScript build step. The dashboard reads the run files straight off disk. Nothing leaves your machine, and you do not need a cloud account.
 
 ## Options
 
 <ParamField path="run" type="string">
-  Run name under `./strix_runs`. Defaults to the most recent run.
+  Run name under `./halo_runs`. Defaults to the most recent run.
 </ParamField>
 
 <ParamField path="--host" type="string" default="127.0.0.1">
@@ -36,7 +36,7 @@ The UI ships prebuilt with Strix, so there is no extra install and no JavaScript
 - **Overview** — run status, target, and a severity breakdown of everything found so far.
 - **Vulnerabilities** — each validated finding with its severity, details, and reproduction steps.
 - **Agent graph** — a live map of the multi-agent team, and what each agent is doing.
-- **Steering** — send instructions to a live scan to redirect the agents during the run. Steering works only in the dashboard the running scan opens. A standalone `strix view` has no live scan to steer.
+- **Steering** — send instructions to a live scan to redirect the agents during the run. Steering works only in the dashboard the running scan opens. A standalone `halo view` has no live scan to steer.
 - **History** — browse past runs on this machine and move between them. Verify your email address in the dashboard to unlock the other runs.
 - **Reports** — generate a shareable report and send it by email. Verify your email address first.
 

@@ -8,14 +8,14 @@ from pathlib import Path
 import pytest
 from rich.console import Console
 
-from strix.interface import update_check
+from halo.interface import update_check
 
 
 @pytest.fixture(autouse=True)
 def _isolated_cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(update_check, "_CACHE_PATH", tmp_path / "update-check.json")
     monkeypatch.setattr(update_check, "_background_thread", None)
-    monkeypatch.delenv("STRIX_NO_UPDATE_CHECK", raising=False)
+    monkeypatch.delenv("HALO_NO_UPDATE_CHECK", raising=False)
     for key in ("CI", "GITHUB_ACTIONS", "GITLAB_CI", "JENKINS_URL", "BUILDKITE", "CIRCLECI"):
         monkeypatch.delenv(key, raising=False)
 
@@ -58,7 +58,7 @@ def test_get_available_update_disabled_by_env(monkeypatch: pytest.MonkeyPatch) -
         json.dumps({"latest_version": "9.9.9", "checked_at": time.time()})
     )
     monkeypatch.setattr(update_check, "get_version", lambda: "1.0.0")
-    monkeypatch.setenv("STRIX_NO_UPDATE_CHECK", "1")
+    monkeypatch.setenv("HALO_NO_UPDATE_CHECK", "1")
     assert update_check.get_available_update() is None
 
 
@@ -133,10 +133,10 @@ def test_write_cache_preserves_existing_fields() -> None:
 
 
 def test_get_upgrade_command_all_methods() -> None:
-    assert update_check.get_upgrade_command("binary") == "strix --update"
-    assert update_check.get_upgrade_command("pipx") == "pipx upgrade strix-agent"
-    assert update_check.get_upgrade_command("uv") == "uv tool upgrade strix-agent"
-    assert update_check.get_upgrade_command("pip") == "pip install --upgrade strix-agent"
+    assert update_check.get_upgrade_command("binary") == "halo --update"
+    assert update_check.get_upgrade_command("pipx") == "pipx upgrade halo-agent"
+    assert update_check.get_upgrade_command("uv") == "uv tool upgrade halo-agent"
+    assert update_check.get_upgrade_command("pip") == "pip install --upgrade halo-agent"
 
 
 def test_self_update_non_binary_prints_command(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -156,7 +156,7 @@ def test_self_update_already_latest(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_restart_env_strips_pyinstaller_vars(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("_MEIPASS2", "/stale/_MEIold")
     monkeypatch.setenv("_PYI_APPLICATION_HOME_DIR", "/stale/_MEIold")
-    monkeypatch.setenv("_PYI_ARCHIVE_FILE", "/old/strix")
+    monkeypatch.setenv("_PYI_ARCHIVE_FILE", "/old/halo")
     monkeypatch.setenv("_PYI_PARENT_PROCESS_LEVEL", "1")
     monkeypatch.setenv("SOME_OTHER_VAR", "kept")
 
@@ -182,8 +182,8 @@ def test_restart_env_restores_library_paths(monkeypatch: pytest.MonkeyPatch) -> 
 
 def test_sha256_file(tmp_path: Path) -> None:
     path = tmp_path / "blob"
-    path.write_bytes(b"strix")
-    assert update_check._sha256_file(path) == hashlib.sha256(b"strix").hexdigest()
+    path.write_bytes(b"halo")
+    assert update_check._sha256_file(path) == hashlib.sha256(b"halo").hexdigest()
 
 
 @pytest.mark.parametrize(

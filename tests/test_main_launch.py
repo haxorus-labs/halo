@@ -10,12 +10,12 @@ from typing import Any
 import pytest
 
 
-cli_main: Any = importlib.import_module("strix.interface.main")
-cli_args: Any = importlib.import_module("strix.interface.cli_args")
-report_state_module: Any = importlib.import_module("strix.report.state")
-interactive: Any = importlib.import_module("strix.interface.interactive")
-tui_runtime: Any = importlib.import_module("strix.interface.tui.runtime")
-tui_sidecar: Any = importlib.import_module("strix.interface.tui.sidecar")
+cli_main: Any = importlib.import_module("halo.interface.main")
+cli_args: Any = importlib.import_module("halo.interface.cli_args")
+report_state_module: Any = importlib.import_module("halo.report.state")
+interactive: Any = importlib.import_module("halo.interface.interactive")
+tui_runtime: Any = importlib.import_module("halo.interface.tui.runtime")
+tui_sidecar: Any = importlib.import_module("halo.interface.tui.sidecar")
 
 
 def _launch(
@@ -42,9 +42,9 @@ def _launch(
     async def run_cli(_args: argparse.Namespace) -> None:
         calls.append("cli")
 
-    monkeypatch.setattr(sys, "argv", ["strix", "--target", "https://example.com"])
+    monkeypatch.setattr(sys, "argv", ["halo", "--target", "https://example.com"])
     monkeypatch.setattr(cli_main, "terminal_attached", lambda: terminal)
-    monkeypatch.setattr("strix.interface.cli.run_cli", run_cli)
+    monkeypatch.setattr("halo.interface.cli.run_cli", run_cli)
     monkeypatch.setattr(cli_main, "report_error", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(cli_main, "_print_error_panel", lambda title, _msg: calls.append(title))
     monkeypatch.setattr(cli_main, "display_completion_message", lambda *_args: None)
@@ -121,7 +121,7 @@ def test_tui_startup_failure_marks_the_prepared_run_failed(monkeypatch: pytest.M
     async def run_tui(_args: argparse.Namespace) -> None:
         raise cli_main.InteractiveSetupUnavailableError("no sidecar")
 
-    monkeypatch.setattr(sys, "argv", ["strix", "--target", "https://example.com"])
+    monkeypatch.setattr(sys, "argv", ["halo", "--target", "https://example.com"])
     monkeypatch.setattr(cli_main, "terminal_attached", lambda: True)
     monkeypatch.setattr(cli_main, "setup_console_logging", lambda: None)
     monkeypatch.setattr(cli_main, "start_import_warmup", lambda: None)
@@ -259,7 +259,7 @@ def test_tui_process_dying_after_startup_prints_a_panel_instead_of_a_traceback(
     async def run_tui(_args: argparse.Namespace) -> None:
         raise cli_main.InteractiveInterfaceExitedError("Bubble Tea TUI exited with status 1")
 
-    monkeypatch.setattr(sys, "argv", ["strix", "--target", "https://example.com"])
+    monkeypatch.setattr(sys, "argv", ["halo", "--target", "https://example.com"])
     monkeypatch.setattr(cli_main, "terminal_attached", lambda: True)
     monkeypatch.setattr(cli_main, "setup_console_logging", lambda: None)
     monkeypatch.setattr(cli_main, "start_import_warmup", lambda: None)
@@ -289,7 +289,7 @@ def test_tui_process_dying_after_startup_prints_a_panel_instead_of_a_traceback(
         (
             "INTERACTIVE INTERFACE STOPPED",
             "Bubble Tea TUI exited with status 1.\n"
-            "If Strix runs without a terminal (CI, nohup, pipes), pass -n to run headless.",
+            "If Halo runs without a terminal (CI, nohup, pipes), pass -n to run headless.",
         )
     ]
 

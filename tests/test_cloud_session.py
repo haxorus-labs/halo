@@ -9,9 +9,9 @@ import pytest
 import requests
 from rich.console import Console
 
-from strix.interface import cloud, platform_cli, platform_identity
-from strix.interface.cloud import http
-from strix.interface.cloud import session as cloud_session
+from halo.interface import cloud, platform_cli, platform_identity
+from halo.interface.cloud import http
+from halo.interface.cloud import session as cloud_session
 
 
 if TYPE_CHECKING:
@@ -34,8 +34,8 @@ class Response:
 def auth_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     path = tmp_path / "platform-auth.json"
     monkeypatch.setattr(platform_cli, "AUTH_PATH", path)
-    monkeypatch.delenv("STRIX_API_TOKEN", raising=False)
-    monkeypatch.delenv("STRIX_WORKSPACE_ID", raising=False)
+    monkeypatch.delenv("HALO_API_TOKEN", raising=False)
+    monkeypatch.delenv("HALO_WORKSPACE_ID", raising=False)
     return path
 
 
@@ -66,7 +66,7 @@ def test_http_workspace_pin_is_captured_once(
         }
     )
     http.request("GET", "/scans")
-    assert sent[0]["X-Strix-Workspace"] == "org_start"
+    assert sent[0]["X-Halo-Workspace"] == "org_start"
 
 
 def test_session_scope_update_persists_only_for_stored_session(

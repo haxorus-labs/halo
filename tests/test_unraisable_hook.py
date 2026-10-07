@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from strix.telemetry import logging as tlog
+from halo.telemetry import logging as tlog
 
 
 if TYPE_CHECKING:
@@ -28,7 +28,7 @@ def _unraisable(exc: BaseException, obj: object, err_msg: str | None = None) -> 
 
 
 @pytest.fixture
-def strix_records() -> Iterator[list[logging.LogRecord]]:
+def halo_records() -> Iterator[list[logging.LogRecord]]:
     records: list[logging.LogRecord] = []
 
     class _Collect(logging.Handler):
@@ -36,7 +36,7 @@ def strix_records() -> Iterator[list[logging.LogRecord]]:
             records.append(record)
 
     handler = _Collect()
-    root = logging.getLogger("strix")
+    root = logging.getLogger("halo")
     root.addHandler(handler)
     try:
         yield records
@@ -71,16 +71,16 @@ def default_hook_calls(monkeypatch: pytest.MonkeyPatch) -> list[object]:
 def test_every_unraisable_is_logged_not_printed(
     args: object,
     default_hook_calls: list[object],
-    strix_records: list[logging.LogRecord],
+    halo_records: list[logging.LogRecord],
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     sys.unraisablehook(args)  # type: ignore[arg-type]
 
     assert default_hook_calls == []
     assert capsys.readouterr().err == ""
-    [record] = strix_records
+    [record] = halo_records
     assert record.levelno == logging.WARNING
-    assert record.name == "strix.telemetry"
+    assert record.name == "halo.telemetry"
     message = logging.Formatter().format(record)
     if args.err_msg:  # type: ignore[attr-defined]
         assert message.startswith(args.err_msg)  # type: ignore[attr-defined]
@@ -90,10 +90,10 @@ def test_every_unraisable_is_logged_not_printed(
 
 
 @pytest.mark.usefixtures("default_hook_calls")
-def test_unraisable_is_dropped_when_strix_has_no_handlers(
+def test_unraisable_is_dropped_when_halo_has_no_handlers(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    root = logging.getLogger("strix")
+    root = logging.getLogger("halo")
     saved, root.handlers = root.handlers, []
     try:
         sys.unraisablehook(_unraisable(RuntimeError("late"), object()))  # type: ignore[arg-type]
@@ -104,7 +104,7 @@ def test_unraisable_is_dropped_when_strix_has_no_handlers(
 
 _EXIT_SCRIPT = r"""
 import io, sys
-from strix.telemetry.logging import setup_console_logging
+from halo.telemetry.logging import setup_console_logging
 setup_console_logging()
 
 class Leaky:
@@ -126,7 +126,7 @@ def test_process_exit_prints_nothing_to_stderr() -> None:
     env = {
         k: v for k, v in os.environ.items() if k in {"PATH", "HOME", "SYSTEMROOT", "TEMP", "TMP"}
     }
-    env |= {"PYTHONPATH": str(Path(__file__).resolve().parents[1]), "STRIX_DEBUG": ""}
+    env |= {"PYTHONPATH": str(Path(__file__).resolve().parents[1]), "HALO_DEBUG": ""}
     proc = subprocess.run(  # noqa: S603
         [sys.executable, "-c", _EXIT_SCRIPT],
         capture_output=True,

@@ -7,9 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from strix.config import apply_config_override, loader
-from strix.config.settings import DEFAULT_MAX_TURNS
-from strix.interface.tui.backend.controller import TuiController
+from halo.config import apply_config_override, loader
+from halo.config.settings import DEFAULT_MAX_TURNS
+from halo.interface.tui.backend.controller import TuiController
 
 
 class _SendingCoordinator:
@@ -42,7 +42,7 @@ def args() -> argparse.Namespace:
 @pytest.fixture(autouse=True)
 def isolated_config(tmp_path: Path) -> None:
     for key in (
-        "STRIX_LLM",
+        "HALO_LLM",
         "OPENAI_API_KEY",
         "ANTHROPIC_API_KEY",
         "LLM_API_KEY",
@@ -164,7 +164,7 @@ async def test_start_launches_with_a_configured_model() -> None:
         nonlocal started
         started = True
 
-    os.environ["STRIX_LLM"] = "anthropic/claude-sonnet-4"
+    os.environ["HALO_LLM"] = "anthropic/claude-sonnet-4"
     loader._cached = None
     controller = TuiController(args(), on_start=start)
     await controller.handle("setup.add_target", {"target": "https://example.com"})
@@ -183,7 +183,7 @@ async def test_start_without_target_requires_mount_consent() -> None:
         nonlocal started
         started = True
 
-    os.environ["STRIX_LLM"] = "anthropic/claude-sonnet-4"
+    os.environ["HALO_LLM"] = "anthropic/claude-sonnet-4"
     os.environ["ANTHROPIC_API_KEY"] = "test-key"
     loader._cached = None
     controller = TuiController(args(), on_start=start)
@@ -205,7 +205,7 @@ async def test_target_less_start_enters_live_view_and_waits_for_the_mount() -> N
         nonlocal started
         started = True
 
-    os.environ["STRIX_LLM"] = "anthropic/claude-sonnet-4"
+    os.environ["HALO_LLM"] = "anthropic/claude-sonnet-4"
     os.environ["ANTHROPIC_API_KEY"] = "test-key"
     loader._cached = None
     controller = TuiController(args(), on_start=start)
@@ -231,7 +231,7 @@ async def test_confirming_the_mount_starts_the_scan_without_a_target() -> None:
         nonlocal started
         started = True
 
-    os.environ["STRIX_LLM"] = "anthropic/claude-sonnet-4"
+    os.environ["HALO_LLM"] = "anthropic/claude-sonnet-4"
     os.environ["ANTHROPIC_API_KEY"] = "test-key"
     loader._cached = None
     controller = TuiController(args(), on_start=start)
@@ -257,7 +257,7 @@ async def test_declining_the_mount_runs_without_one() -> None:
         nonlocal started
         started += 1
 
-    os.environ["STRIX_LLM"] = "anthropic/claude-sonnet-4"
+    os.environ["HALO_LLM"] = "anthropic/claude-sonnet-4"
     os.environ["ANTHROPIC_API_KEY"] = "test-key"
     loader._cached = None
     controller = TuiController(args(), on_start=start)
@@ -283,7 +283,7 @@ async def test_approving_the_mount_runs_with_it() -> None:
         nonlocal started
         started += 1
 
-    os.environ["STRIX_LLM"] = "anthropic/claude-sonnet-4"
+    os.environ["HALO_LLM"] = "anthropic/claude-sonnet-4"
     os.environ["ANTHROPIC_API_KEY"] = "test-key"
     loader._cached = None
     controller = TuiController(args(), on_start=start)
@@ -321,7 +321,7 @@ async def test_user_message_updates_live_agent_projection_immediately() -> None:
     controller.scan_loop = asyncio.get_running_loop()
     controller.live_view.upsert_agent(
         "root",
-        name="Strix",
+        name="Halo",
         status="failed",
         error_message="provider rejected request",
     )
@@ -350,7 +350,7 @@ async def test_start_verifies_the_model_before_a_targeted_launch() -> None:
     async def start() -> None:
         order.append("start")
 
-    os.environ["STRIX_LLM"] = "anthropic/claude-sonnet-4"
+    os.environ["HALO_LLM"] = "anthropic/claude-sonnet-4"
     os.environ["ANTHROPIC_API_KEY"] = "test-key"
     loader._cached = None
     controller = TuiController(args(), on_start=start, on_verify=verify)
@@ -374,7 +374,7 @@ async def test_start_verifies_the_model_before_a_bare_prompt_leaves_setup() -> N
     async def start() -> None:
         return None
 
-    os.environ["STRIX_LLM"] = "anthropic/claude-sonnet-4"
+    os.environ["HALO_LLM"] = "anthropic/claude-sonnet-4"
     os.environ["ANTHROPIC_API_KEY"] = "test-key"
     loader._cached = None
     controller = TuiController(args(), on_start=start, on_verify=verify)
@@ -394,7 +394,7 @@ async def test_failed_model_check_keeps_the_start_screen() -> None:
     async def start() -> None:
         pytest.fail("the scan must not start when the model check fails")
 
-    os.environ["STRIX_LLM"] = "anthropic/claude-sonnet-4"
+    os.environ["HALO_LLM"] = "anthropic/claude-sonnet-4"
     os.environ["ANTHROPIC_API_KEY"] = "test-key"
     loader._cached = None
     controller = TuiController(args(), on_start=start, on_verify=verify)
@@ -415,7 +415,7 @@ async def test_confirmed_mount_launch_failure_is_reported_in_the_live_view() -> 
     async def start() -> None:
         raise ValueError("Scan preparation failed")
 
-    os.environ["STRIX_LLM"] = "anthropic/claude-sonnet-4"
+    os.environ["HALO_LLM"] = "anthropic/claude-sonnet-4"
     os.environ["ANTHROPIC_API_KEY"] = "test-key"
     loader._cached = None
     controller = TuiController(args(), on_start=start)
@@ -437,7 +437,7 @@ async def test_start_rejects_concurrent_and_repeated_submissions() -> None:
         entered.set()
         await release.wait()
 
-    os.environ["STRIX_LLM"] = "anthropic/claude-sonnet-4"
+    os.environ["HALO_LLM"] = "anthropic/claude-sonnet-4"
     os.environ["ANTHROPIC_API_KEY"] = "test-key"
     loader._cached = None
     controller = TuiController(args(), on_start=start)
@@ -552,7 +552,7 @@ async def test_existing_viewer_is_reopened_and_closed(
     controller.viewer_url = "http://127.0.0.1:1234/?token=test"
     server = ViewerServer()
     controller._viewer_httpd = server
-    monkeypatch.setattr("strix.interface.tui.backend.controller.webbrowser.open", opened.append)
+    monkeypatch.setattr("halo.interface.tui.backend.controller.webbrowser.open", opened.append)
 
     result = await controller.handle("viewer.open", {})
     controller.close_viewer()

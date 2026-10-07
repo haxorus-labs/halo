@@ -1,17 +1,17 @@
-"""Tests for the coverage artifact assembled in strix.report.coverage."""
+"""Tests for the coverage artifact assembled in halo.report.coverage."""
 
 from __future__ import annotations
 
 import json
 from typing import TYPE_CHECKING, Any
 
-from strix.report.coverage import (
+from halo.report.coverage import (
     _SKILL_PHRASINGS,
     build_coverage_document,
     read_agent_graph,
     write_coverage,
 )
-from strix.skills import get_available_skills
+from halo.skills import get_available_skills
 
 
 if TYPE_CHECKING:

@@ -1,4 +1,4 @@
-"""Tests for the `strix cloud` CLI: routing, request building, and output."""
+"""Tests for the `halo cloud` CLI: routing, request building, and output."""
 
 from __future__ import annotations
 
@@ -16,9 +16,9 @@ import pytest
 import requests
 from rich.console import Console
 
-from strix.interface import cloud, platform_cli
-from strix.interface.cloud import http, render, runner, workspaces
-from strix.interface.cloud.spec import GROUP_HELP, SPEC
+from halo.interface import cloud, platform_cli
+from halo.interface.cloud import http, render, runner, workspaces
+from halo.interface.cloud.spec import GROUP_HELP, SPEC
 
 
 class FakeResponse:
@@ -51,7 +51,7 @@ class FakeResponse:
 
 @pytest.fixture(autouse=True)
 def _token_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("STRIX_API_TOKEN", "test-token")
+    monkeypatch.setenv("HALO_API_TOKEN", "test-token")
 
 
 def test_help_returns_zero() -> None:
@@ -79,7 +79,7 @@ def test_successful_html_response_is_reported_without_dumping_html(
     assert cloud.run_cloud(["workspaces", "list", "--json"]) == 1
     output = capsys.readouterr().out
     assert "non-JSON response" in output
-    assert "STRIX_APP_URL" in output
+    assert "HALO_APP_URL" in output
     assert "<!DOCTYPE" not in output
 
 
@@ -183,9 +183,9 @@ def test_placeholder_substitution_percent_encodes_path_segments(
         return FakeResponse(payload={"entries": []})
 
     monkeypatch.setattr(http, "request", fake_request)
-    code = cloud.run_cloud(["knowledge", "repos", "entries", "usestrix/.github", "--json"])
+    code = cloud.run_cloud(["knowledge", "repos", "entries", "usehalo/.github", "--json"])
     assert code == 0
-    assert seen["path"] == "/knowledge/repos/usestrix%2F.github/entries"
+    assert seen["path"] == "/knowledge/repos/usehalo%2F.github/entries"
 
 
 def test_query_and_body_collection(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -241,7 +241,7 @@ def test_token_create_accepts_expiry_and_rbac_scope_flags(
 
     def fake_request(_method: str, _path: str, **kwargs: Any) -> FakeResponse:
         seen["body"] = kwargs.get("body")
-        return FakeResponse(payload={"id": "token-1", "token": "strix_pat_once"})
+        return FakeResponse(payload={"id": "token-1", "token": "halo_pat_once"})
 
     monkeypatch.setattr(http, "request", fake_request)
     code = cloud.run_cloud(
@@ -354,7 +354,7 @@ def test_required_secret_body_field_can_come_from_stdin(
     assert seen["body"] == {"access_token": "provider-secret"}
 
 
-def test_provider_token_does_not_override_strix_api_auth(
+def test_provider_token_does_not_override_halo_api_auth(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     seen: dict[str, Any] = {}
@@ -546,25 +546,25 @@ def test_insufficient_credits_always_prints_topup_instruction(
         ),
     )
     monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
-    argv = ["scans", "start", "--domain-ids", "d1", "--app-url", "https://app.strix.ai"]
+    argv = ["scans", "start", "--domain-ids", "d1", "--app-url", "https://app.halo.ai"]
     assert cloud.run_cloud(argv) == http.EXIT_PAYMENT
     output = " ".join(capsys.readouterr().out.split())
     assert "Error: Out of credits." in output
     assert "Next step:" in output
-    assert "strix cloud billing topup --credits <count>" in output
-    assert "https://app.strix.ai/settings/billing" in output
-    assert "strix cloud billing credits" in output
+    assert "halo cloud billing topup --credits <count>" in output
+    assert "https://app.halo.ai/settings/billing" in output
+    assert "halo cloud billing credits" in output
 
 
 def test_insufficient_credits_shows_platform_hint_once(
     monkeypatch: pytest.MonkeyPatch, capsys: Any
 ) -> None:
-    hint = "Buy credits at https://app.strix.ai/settings/billing. Then retry this request."
+    hint = "Buy credits at https://app.halo.ai/settings/billing. Then retry this request."
     payload = {
         "detail": f"Out of credits. {hint}",
         "code": "scan_credit_limit_reached",
         "hint": hint,
-        "topup_url": "https://app.strix.ai/settings/billing",
+        "topup_url": "https://app.halo.ai/settings/billing",
     }
     monkeypatch.setattr(
         http, "request", lambda *_a, **_k: FakeResponse(status_code=402, payload=payload)
@@ -573,7 +573,7 @@ def test_insufficient_credits_shows_platform_hint_once(
     result = json.loads(capsys.readouterr().out)
     assert result["error"] == "Out of credits."
     assert result["next_step"] == hint
-    assert result["topup_url"] == "https://app.strix.ai/settings/billing"
+    assert result["topup_url"] == "https://app.halo.ai/settings/billing"
 
     monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
     assert cloud.run_cloud(["scans", "start", "--domain-ids", "d1"]) == http.EXIT_PAYMENT
@@ -589,12 +589,12 @@ def test_payment_required_without_body_names_the_topup_command(
     monkeypatch.setattr(
         http, "request", lambda *_a, **_k: FakeResponse(status_code=402, payload={})
     )
-    argv = ["scans", "start", "--domain-ids", "d1", "--json", "--app-url", "https://app.strix.ai"]
+    argv = ["scans", "start", "--domain-ids", "d1", "--json", "--app-url", "https://app.halo.ai"]
     assert cloud.run_cloud(argv) == http.EXIT_PAYMENT
     result = json.loads(capsys.readouterr().out)
     assert result["error"] == "Not enough credits to run this command."
-    assert "strix cloud billing topup --credits <count>" in result["next_step"]
-    assert "https://app.strix.ai/settings/billing" in result["next_step"]
+    assert "halo cloud billing topup --credits <count>" in result["next_step"]
+    assert "https://app.halo.ai/settings/billing" in result["next_step"]
 
 
 def test_data_rejects_non_object() -> None:
@@ -609,7 +609,7 @@ def test_typed_json_flag_parse_error_is_usage_error() -> None:
 def test_missing_token_exits_with_auth_code(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    monkeypatch.delenv("STRIX_API_TOKEN", raising=False)
+    monkeypatch.delenv("HALO_API_TOKEN", raising=False)
     monkeypatch.setattr(platform_cli, "AUTH_PATH", tmp_path / "platform-auth.json")
     assert cloud.run_cloud(["credits"]) == http.EXIT_AUTH
 
@@ -617,12 +617,12 @@ def test_missing_token_exits_with_auth_code(
 def test_stored_token_is_never_sent_to_a_different_platform_origin(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.delenv("STRIX_API_TOKEN", raising=False)
+    monkeypatch.delenv("HALO_API_TOKEN", raising=False)
     monkeypatch.setattr(http, "_app_url_override", "https://attacker.example")
     monkeypatch.setattr(
         http,
         "read_record",
-        lambda: {"api_token": "stored-secret", "app_url": "https://app.strix.ai"},
+        lambda: {"api_token": "stored-secret", "app_url": "https://app.halo.ai"},
     )
     monkeypatch.setattr(
         requests,
@@ -636,8 +636,8 @@ def test_stored_token_is_never_sent_to_a_different_platform_origin(
 
 
 def test_stored_token_requires_an_issuer_binding(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("STRIX_API_TOKEN", raising=False)
-    monkeypatch.setattr(http, "_app_url_override", "https://app.strix.ai")
+    monkeypatch.delenv("HALO_API_TOKEN", raising=False)
+    monkeypatch.setattr(http, "_app_url_override", "https://app.halo.ai")
     monkeypatch.setattr(http, "read_record", lambda: {"api_token": "legacy-secret"})
     monkeypatch.setattr(
         requests,
@@ -653,12 +653,12 @@ def test_stored_token_requires_an_issuer_binding(monkeypatch: pytest.MonkeyPatch
 def test_stored_token_is_sent_only_to_its_bound_platform(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.delenv("STRIX_API_TOKEN", raising=False)
-    monkeypatch.setattr(http, "_app_url_override", "https://preview.strix.ai")
+    monkeypatch.delenv("HALO_API_TOKEN", raising=False)
+    monkeypatch.setattr(http, "_app_url_override", "https://preview.halo.ai")
     monkeypatch.setattr(
         http,
         "read_record",
-        lambda: {"api_token": "stored-secret", "app_url": "https://preview.strix.ai"},
+        lambda: {"api_token": "stored-secret", "app_url": "https://preview.halo.ai"},
     )
     seen: dict[str, Any] = {}
 
@@ -670,19 +670,19 @@ def test_stored_token_is_sent_only_to_its_bound_platform(
     response = http.request("GET", "/billing/credits")
 
     assert response.status_code == 200
-    assert seen["url"] == "https://preview.strix.ai/api/v1/billing/credits"
+    assert seen["url"] == "https://preview.halo.ai/api/v1/billing/credits"
     assert seen["headers"]["Authorization"] == "Bearer stored-secret"
 
 
 def test_explicit_token_can_target_an_explicit_platform(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.delenv("STRIX_API_TOKEN", raising=False)
-    monkeypatch.setattr(http, "_app_url_override", "https://preview.strix.ai")
+    monkeypatch.delenv("HALO_API_TOKEN", raising=False)
+    monkeypatch.setattr(http, "_app_url_override", "https://preview.halo.ai")
     monkeypatch.setattr(
         http,
         "read_record",
-        lambda: {"api_token": "stored-secret", "app_url": "https://app.strix.ai"},
+        lambda: {"api_token": "stored-secret", "app_url": "https://app.halo.ai"},
     )
     seen: dict[str, Any] = {}
 
@@ -695,7 +695,7 @@ def test_explicit_token_can_target_an_explicit_platform(
     response = http.request("GET", "/billing/credits", token=override_value)
 
     assert response.status_code == 200
-    assert seen["url"] == "https://preview.strix.ai/api/v1/billing/credits"
+    assert seen["url"] == "https://preview.halo.ai/api/v1/billing/credits"
     assert seen["headers"]["Authorization"] == f"Bearer {override_value}"
 
 
@@ -724,11 +724,11 @@ def test_credits_alias_routes_to_billing(monkeypatch: pytest.MonkeyPatch) -> Non
 def test_whoami_json_is_machine_readable_and_omits_the_token(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: Any
 ) -> None:
-    monkeypatch.delenv("STRIX_API_TOKEN", raising=False)
+    monkeypatch.delenv("HALO_API_TOKEN", raising=False)
     monkeypatch.setattr(platform_cli, "AUTH_PATH", tmp_path / "platform-auth.json")
     platform_cli.save_record(
         {
-            "api_token": "strix_pat_secret",
+            "api_token": "halo_pat_secret",
             "email": "agent@example.test",
             "organization_id": "org_1",
             "organization_name": "Example",
@@ -944,7 +944,7 @@ def test_topup_keeps_token_out_of_wallet_process_and_forwards_payment(
     assert "--ignore-scripts" in commands[0]
     assert "-H" not in commands[0]
     assert "--fail" in commands[0]
-    assert child_envs[0].get("STRIX_API_TOKEN") is None
+    assert child_envs[0].get("HALO_API_TOKEN") is None
     assert child_envs[0].get("UNRELATED_CODING_AGENT_SECRET") is None
     for name in ("NO_PROXY", "no_proxy"):
         bypasses = child_envs[0][name].split(",")
@@ -954,7 +954,7 @@ def test_topup_keeps_token_out_of_wallet_process_and_forwards_payment(
     assert child_cwds[0] != tmp_path
     assert upstream["method"] == "POST"
     assert upstream["url"].endswith("/api/v1/billing/topup")
-    assert upstream["headers"]["X-Strix-Authorization"] == f"Bearer {api_credential}"
+    assert upstream["headers"]["X-Halo-Authorization"] == f"Bearer {api_credential}"
     assert upstream["headers"]["Authorization"] == "Payment wallet-credential"
     assert upstream["data"] == json.dumps({"credits": 5}).encode()
     assert "-M" in commands[0]
@@ -1282,7 +1282,7 @@ def test_report_branding_flags_preserve_the_api_query_names(
                 "report",
                 "scan-1",
                 "--provider-name",
-                "Strix Partner",
+                "Halo Partner",
                 "--member-name-0",
                 "Alex",
                 "--member-email-0",
@@ -1299,7 +1299,7 @@ def test_report_branding_flags_preserve_the_api_query_names(
     )
     assert output.read_bytes() == b"report"
     assert seen["query"] == {
-        "providerName": "Strix Partner",
+        "providerName": "Halo Partner",
         "memberName0": "Alex",
         "memberEmail0": "alex@example.test",
         "memberName1": "Sam",
@@ -1483,7 +1483,7 @@ def test_every_command_builds_a_parser() -> None:
     for group, commands in SPEC.items():
         for verb, cmd in commands.items():
             parser = runner._build_parser(group, verb, cmd)
-            assert parser.prog == f"strix cloud {group} {verb}"
+            assert parser.prog == f"halo cloud {group} {verb}"
 
 
 def test_app_url_and_timeout_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1523,11 +1523,11 @@ def test_billing_subscribe_prints_checkout_url(
         return FakeResponse(status_code=200, payload={"checkout_url": "https://pay.test/session"})
 
     monkeypatch.setattr(http, "request", fake_request)
-    code = cloud.run_cloud(["billing", "subscribe", "--plan", "strix_cloud", "--json"])
+    code = cloud.run_cloud(["billing", "subscribe", "--plan", "halo_cloud", "--json"])
     assert code == 0
     assert seen["method"] == "POST"
     assert seen["path"] == "/billing/checkout"
-    assert seen["body"] == {"product": "strix_cloud"}
+    assert seen["body"] == {"product": "halo_cloud"}
     assert "https://pay.test/session" in capsys.readouterr().out
 
 
@@ -1652,7 +1652,7 @@ def test_integration_install_url_does_not_open_browser(
     "argv,payload",
     [
         (
-            ["billing", "subscribe", "--plan", "strix_cloud"],
+            ["billing", "subscribe", "--plan", "halo_cloud"],
             {"checkout_url": "file:///tmp/not-a-checkout"},
         ),
         (
@@ -1700,7 +1700,7 @@ def test_handoff_missing_expected_url_is_an_error(
 def test_workspaces_use_switches_stored_token(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: Any
 ) -> None:
-    monkeypatch.delenv("STRIX_API_TOKEN", raising=False)
+    monkeypatch.delenv("HALO_API_TOKEN", raising=False)
     auth_path = tmp_path / "platform-auth.json"
     monkeypatch.setattr(platform_cli, "AUTH_PATH", auth_path)
     monkeypatch.setattr(workspaces, "AUTH_PATH", auth_path)
@@ -1817,7 +1817,7 @@ def test_workspace_use_environment_token_starts_with_fresh_account_state(
     auth_path = tmp_path / "platform-auth.json"
     monkeypatch.setattr(platform_cli, "AUTH_PATH", auth_path)
     monkeypatch.setattr(workspaces, "AUTH_PATH", auth_path)
-    monkeypatch.setenv("STRIX_API_TOKEN", "account-b-token")
+    monkeypatch.setenv("HALO_API_TOKEN", "account-b-token")
     platform_cli.save_record(
         {
             "api_token": "account-a-token",
@@ -1871,7 +1871,7 @@ def test_workspaces_use_reports_unknown_workspace(monkeypatch: pytest.MonkeyPatc
 def test_workspaces_use_reports_auth_storage_failure(
     monkeypatch: pytest.MonkeyPatch, capsys: Any
 ) -> None:
-    monkeypatch.delenv("STRIX_API_TOKEN", raising=False)
+    monkeypatch.delenv("HALO_API_TOKEN", raising=False)
 
     def fake_request(method: str, path: str, **_kwargs: Any) -> FakeResponse:
         if method == "GET":
@@ -2009,7 +2009,7 @@ def test_integrations_human_list_exposes_installation_id_and_json_stays_full(
                 "connected_by": "user-secret",
                 "provider": "github",
                 "installation_id": 154419799,
-                "account_login": "usestrix",
+                "account_login": "usehalo",
                 "repository_selection": "selected",
                 "connected_at": "2026-08-27T12:00:00Z",
             }
@@ -2029,7 +2029,7 @@ def test_integrations_human_list_exposes_installation_id_and_json_stays_full(
 
     assert cloud.run_cloud(["integrations", "list"]) == 0
     output = capsys.readouterr().out
-    for value in ("1.", "2.", "github", "usestrix", "154419799", "jira", "Security"):
+    for value in ("1.", "2.", "github", "usehalo", "154419799", "jira", "Security"):
         assert value in output
     for value in ("integration-uuid", "merge-uuid", "org-secret", "user-secret"):
         assert value not in output
@@ -2054,7 +2054,7 @@ def test_pr_review_human_list_prioritizes_actionable_fields(
                         "organization_id": "org-id",
                         "user_id": "user-id",
                         "installation_id": 42,
-                        "repository_full_name": "usestrix/strix",
+                        "repository_full_name": "usehalo/halo",
                         "pr_number": 1177,
                         "pr_title": "Improve cloud CLI",
                         "head_branch": "feature",
@@ -2092,7 +2092,7 @@ def test_pr_review_human_list_prioritizes_actionable_fields(
     assert cloud.run_cloud(["pr-reviews", "list", "--include-counts"]) == 0
     output = capsys.readouterr().out
     for value in (
-        "usestrix/strix",
+        "usehalo/halo",
         "1177",
         "Improve cloud CLI",
         "merged",
@@ -2126,7 +2126,7 @@ def test_pr_review_human_list_shows_pull_request_state(
                 "items": [
                     {
                         "id": f"{pr_state}-review-id",
-                        "repository_full_name": "usestrix/strix",
+                        "repository_full_name": "usehalo/halo",
                         "pr_number": 1177,
                         "pr_title": "Renderer test",
                         "head_branch": "feature",
@@ -2259,7 +2259,7 @@ def test_scan_human_list_identifies_internal_and_uploaded_targets(
                     {
                         "id": "repo-id",
                         "organization_id": "org-secret",
-                        "full_name": "usestrix/strix",
+                        "full_name": "usehalo/halo",
                         "provider": "github",
                         "pr_review_enabled": True,
                         "tags": ["core"],
@@ -2270,7 +2270,7 @@ def test_scan_human_list_identifies_internal_and_uploaded_targets(
                 ],
                 "meta": {"total_items": 1},
             },
-            ("usestrix/strix", "github", "yes", "repo-id"),
+            ("usehalo/halo", "github", "yes", "repo-id"),
             ("org-secret", "user-secret", "added by"),
         ),
         (
@@ -2316,7 +2316,7 @@ def test_scan_human_list_identifies_internal_and_uploaded_targets(
                         "label": "Staging admin",
                         "username": "admin@example.com",
                         "mfa_method": "email_otp",
-                        "mfa_email": "inbox@security-mail.strix.ai",
+                        "mfa_email": "inbox@security-mail.halo.ai",
                         "has_password": True,
                         "login_url": "https://staging.example.com/login",
                         "updated_at": "2026-08-27T12:00:00Z",
@@ -2329,7 +2329,7 @@ def test_scan_human_list_identifies_internal_and_uploaded_targets(
                 "Staging admin",
                 "admin@example.com",
                 "email_otp",
-                "inbox@security-mail.strix.ai",
+                "inbox@security-mail.halo.ai",
                 "test-user-id",
             ),
             ("org-secret", "user-secret", "domain id"),
@@ -2372,7 +2372,7 @@ def test_token_human_list_shows_lifecycle_status(
                         "type": "service",
                         "scopes": ["scans:read"],
                         "rbac_scopes": [],
-                        "secret_prefix": "strix_svc_a",
+                        "secret_prefix": "halo_svc_a",
                         "expires_at": "2099-01-01T00:00:00Z",
                         "last_used_at": None,
                         "revoked_at": None,
@@ -2384,7 +2384,7 @@ def test_token_human_list_shows_lifecycle_status(
                         "type": "service",
                         "scopes": ["scans:read"],
                         "rbac_scopes": [{"type": "tag", "value": "staging"}],
-                        "secret_prefix": "strix_svc_r",
+                        "secret_prefix": "halo_svc_r",
                         "expires_at": None,
                         "last_used_at": None,
                         "revoked_at": "2026-08-27T12:00:00Z",
@@ -2396,7 +2396,7 @@ def test_token_human_list_shows_lifecycle_status(
                         "type": "service",
                         "scopes": ["scans:read"],
                         "rbac_scopes": [{"type": "business_unit", "value": "payments"}],
-                        "secret_prefix": "strix_svc_e",
+                        "secret_prefix": "halo_svc_e",
                         "expires_at": "2000-01-01T00:00:00Z",
                         "last_used_at": None,
                         "revoked_at": None,
@@ -2531,7 +2531,7 @@ def test_token_human_list_shows_lifecycle_status(
                         "id": "pr-finding-id",
                         "pr_review_id": "review-secret",
                         "provider": "github",
-                        "repository_full_name": "usestrix/strix",
+                        "repository_full_name": "usehalo/halo",
                         "pr_number": 1177,
                         "pr_title": "Improve cloud CLI",
                         "pr_state": "open",
@@ -2550,7 +2550,7 @@ def test_token_human_list_shows_lifecycle_status(
                 },
             },
             (
-                "usestrix/strix",
+                "usehalo/halo",
                 "1177",
                 "Improve cloud CLI",
                 "Unsafe redirect",
@@ -2654,7 +2654,7 @@ def test_token_human_list_shows_lifecycle_status(
         (
             ["domains", "test-users", "inbox", "domain-id", "test-user-id"],
             {
-                "address": "inbox@security-mail.strix.ai",
+                "address": "inbox@security-mail.halo.ai",
                 "messages": [
                     {
                         "id": "message-id",
@@ -2671,22 +2671,22 @@ def test_token_human_list_shows_lifecycle_status(
                 "Your code",
                 "123456",
                 "message-id",
-                "Inbox: inbox@security-mail.strix.ai",
+                "Inbox: inbox@security-mail.halo.ai",
             ),
             (),
         ),
         (
-            ["knowledge", "repos", "entries", "usestrix/strix"],
+            ["knowledge", "repos", "entries", "usehalo/halo"],
             {
                 "organization_id": "org-secret",
-                "repo_key": "usestrix/strix",
+                "repo_key": "usehalo/halo",
                 "profile": {"id": "profile-secret", "title": "Profile"},
                 "docs": [
                     {
                         "id": "doc-id",
                         "title": "Auth notes",
                         "source_type": "system",
-                        "source_id": "repos/usestrix__strix/auth.md",
+                        "source_id": "repos/usehalo__halo/auth.md",
                         "tags": [],
                         "updated_at": "2026-08-27T10:00:00Z",
                     }
@@ -2698,7 +2698,7 @@ def test_token_human_list_shows_lifecycle_status(
             (
                 "Auth notes",
                 "system",
-                "repos/usestrix__strix/auth.md",
+                "repos/usehalo__halo/auth.md",
                 "doc-id",
                 "Repository profile: Profile",
                 "1 policy apply",
@@ -2944,14 +2944,14 @@ def test_chat_credentials_human_view_separates_attached_and_available_sources(
             {
                 "repos": [
                     {
-                        "repo_key": "usestrix/strix",
+                        "repo_key": "usehalo/halo",
                         "docs_count": 4,
                         "last_updated_at": "2026-08-27T10:00:00Z",
                         "future_internal_field": "hidden",
                     }
                 ]
             },
-            ("usestrix/strix", "4", "2026-08-27"),
+            ("usehalo/halo", "4", "2026-08-27"),
             ("future_internal_field", "hidden"),
         ),
         (
@@ -3027,7 +3027,7 @@ def test_supply_chain_org_summary_human_view_shows_totals_and_repository_risk(
                         "repository": {
                             "id": "repo-id",
                             "organization_id": "org-secret",
-                            "full_name": "usestrix/strix",
+                            "full_name": "usehalo/halo",
                             "provider": "github",
                         },
                         "summary": {
@@ -3053,7 +3053,7 @@ def test_supply_chain_org_summary_human_view_shows_totals_and_repository_risk(
                         "repository": {
                             "id": "repo-id-2",
                             "organization_id": "org-secret",
-                            "full_name": "usestrix/sdk",
+                            "full_name": "usehalo/sdk",
                             "provider": "github",
                         },
                         "summary": {
@@ -3078,13 +3078,13 @@ def test_supply_chain_org_summary_human_view_shows_totals_and_repository_risk(
         "Supply-chain totals",
         "145",
         "open issues",
-        "usestrix/strix",
+        "usehalo/halo",
         "critical 1",
         "1 malicious",
         "completed",
         "block",
         "PR checks off",
-        "usestrix/sdk",
+        "usehalo/sdk",
         "not run",
         "disabled",
         "repo-id",
@@ -3522,7 +3522,7 @@ def test_wide_knowledge_table_keeps_title_readable_with_long_identifiers() -> No
     stream = io.StringIO()
     console = Console(file=stream, width=120, color_system=None, force_terminal=False)
     document_id = "document-selector-" + "x" * 80
-    source_id = "repos/usestrix__strix/" + "nested/" * 12 + "authentication.md"
+    source_id = "repos/usehalo__halo/" + "nested/" * 12 + "authentication.md"
 
     render.emit(
         console,
@@ -3562,7 +3562,7 @@ def test_human_get_prioritizes_details_and_hides_internal_identity_fields(
                 "id": "review-id",
                 "organization_id": "org-id",
                 "user_id": "user-id",
-                "repository_full_name": "usestrix/strix",
+                "repository_full_name": "usehalo/halo",
                 "pr_number": 1177,
                 "pr_title": "Improve cloud CLI",
                 "verdict": "pass",
@@ -3573,7 +3573,7 @@ def test_human_get_prioritizes_details_and_hides_internal_identity_fields(
 
     assert cloud.run_cloud(["pr-reviews", "get", "review-id"]) == 0
     output = capsys.readouterr().out
-    for value in ("usestrix/strix", "1177", "Improve cloud CLI", "pass", "Example"):
+    for value in ("usehalo/halo", "1177", "Improve cloud CLI", "pass", "Example"):
         assert value in output
     assert "org-id" not in output
     assert "user-id" not in output
@@ -3625,7 +3625,7 @@ def test_logout_help_does_not_remove_stored_auth(
 
     assert cloud.run_cloud(["logout", "--help"]) == 0
     assert platform_cli.read_record() == {"api_token": "keep-me"}
-    assert "usage: strix cloud logout" in capsys.readouterr().out
+    assert "usage: halo cloud logout" in capsys.readouterr().out
 
 
 def test_logout_rejects_unknown_arguments_without_removing_stored_auth(

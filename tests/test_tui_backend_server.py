@@ -11,18 +11,18 @@ from typing import Any, cast
 import pytest
 from agents.tool import ToolOutputImage
 
-from strix.config.settings import DEFAULT_MAX_TURNS
-from strix.interface.tui.backend.controller import TuiController
-from strix.interface.tui.backend.projection import bounded_state_projection, terminal_projection
-from strix.interface.tui.backend.protocol import (
+from halo.config.settings import DEFAULT_MAX_TURNS
+from halo.interface.tui.backend.controller import TuiController
+from halo.interface.tui.backend.projection import bounded_state_projection, terminal_projection
+from halo.interface.tui.backend.protocol import (
     MAX_COMMAND_BYTES,
     PROTOCOL_CAPABILITIES,
     PROTOCOL_VERSION,
     ProtocolHandshakeError,
     envelope,
 )
-from strix.interface.tui.backend.server import TuiBackendServer
-from strix.interface.tui.live_view import TuiLiveView
+from halo.interface.tui.backend.server import TuiBackendServer
+from halo.interface.tui.live_view import TuiLiveView
 
 
 def args() -> argparse.Namespace:

@@ -1,12 +1,12 @@
 ---
 title: "CLI Reference"
-description: "Command-line options for Strix"
+description: "Command-line options for Halo"
 ---
 
 ## Basic Usage
 
 ```bash
-strix (--target <target> | --target-list <path>) [options]
+halo (--target <target> | --target-list <path>) [options]
 ```
 
 ## Options
@@ -14,7 +14,7 @@ strix (--target <target> | --target-list <path>) [options]
 <ParamField path="--target, -t" type="string">
   Target to test. Accepts URLs, repositories, local directories, domains, IP addresses, API spec files (OpenAPI/Swagger `.json`/`.yaml`, a Postman collection export), or a live Postman collection by id (`postman://<collection-uuid>`). Can be specified multiple times. Fresh runs require at least one target source: `--target` or `--target-list`.
 
-  When the target is an API spec, Strix copies it into the agent's workspace and authorizes the base URLs it declares (including those resolved from a Postman environment) as in-scope hosts - so the agent reads the contract and tests the full declared surface instead of discovering endpoints by crawling. Pair the spec with the deployed base URL (e.g. `--target ./openapi.yaml --target https://api.example.com`) so the agent has a reachable host to attack.
+  When the target is an API spec, Halo copies it into the agent's workspace and authorizes the base URLs it declares (including those resolved from a Postman environment) as in-scope hosts - so the agent reads the contract and tests the full declared surface instead of discovering endpoints by crawling. Pair the spec with the deployed base URL (e.g. `--target ./openapi.yaml --target https://api.example.com`) so the agent has a reachable host to attack.
 
   <Note>
     A local directory is mounted into the sandbox live and **writable**, so the agent edits your real files (`.git` excepted). Commit or stash first.
@@ -58,7 +58,7 @@ strix (--target <target> | --target-list <path>) [options]
 
 <ParamField path="--non-interactive, -n" type="boolean">
   Run in headless mode without TUI. Ideal for CI/CD. When no terminal is
-  attached (CI, `nohup`, pipes) and a target is given, Strix runs headless
+  attached (CI, `nohup`, pipes) and a target is given, Halo runs headless
   automatically and says so on one line.
 </ParamField>
 
@@ -66,12 +66,12 @@ strix (--target <target> | --target-list <path>) [options]
   Headless mode only (requires `-n`). Minimum severity that makes the run exit
   `2`: `critical`, `high`, `medium`, `low`, or `info`. Findings below the
   threshold are still written to every report artifact. A finding whose
-  severity Strix does not recognize always counts, so the gate never passes on a
+  severity Halo does not recognize always counts, so the gate never passes on a
   value it cannot rank. Omit the flag to exit `2` on any finding.
 </ParamField>
 
 <ParamField path="--config" type="string">
-  Path to a custom config file (JSON) to use instead of `~/.strix/cli-config.json`.
+  Path to a custom config file (JSON) to use instead of `~/.halo/cli-config.json`.
 </ParamField>
 
 <ParamField path="--max-budget" type="number">
@@ -107,7 +107,7 @@ strix (--target <target> | --target-list <path>) [options]
     concurrently).
   - Cost is a best-effort estimate derived from token usage and model pricing;
     providers that do not expose priced usage may under-count.
-  - For LiteLLM-routed models, Strix enables streaming success callbacks to
+  - For LiteLLM-routed models, Halo enables streaming success callbacks to
     capture provider-reported cost. Message content remains excluded, but
     third-party LiteLLM callbacks configured in the same process can receive
     other streaming metadata such as model names, request IDs, and token
@@ -131,41 +131,41 @@ strix (--target <target> | --target-list <path>) [options]
 
 ```bash
 # Basic scan
-strix --target https://example.com
+halo --target https://example.com
 
 # Authenticated testing
-strix --target https://app.com --instruction "Use credentials: user:pass"
+halo --target https://app.com --instruction "Use credentials: user:pass"
 
 # Focused testing
-strix --target api.example.com --instruction "Focus on IDOR and auth bypass"
+halo --target api.example.com --instruction "Focus on IDOR and auth bypass"
 
 # CI/CD mode
-strix -n --target ./ --scan-mode quick
+halo -n --target ./ --scan-mode quick
 
 # CI/CD mode, failing only on high or critical findings
-strix -n --target ./ --scan-mode quick --fail-on high
+halo -n --target ./ --scan-mode quick --fail-on high
 
 # Cap cost and per-agent turns
-strix --target https://example.com --max-budget 25 --max-turns 300
+halo --target https://example.com --max-budget 25 --max-turns 300
 
 # Force diff-scope against a specific base ref
-strix -n --target ./ --scan-mode quick --scope-mode diff --diff-base origin/main
+halo -n --target ./ --scan-mode quick --scope-mode diff --diff-base origin/main
 
 # Multi-target white-box testing
-strix -t https://github.com/org/app -t https://staging.example.com
+halo -t https://github.com/org/app -t https://staging.example.com
 
 # API spec + live target (OpenAPI/Swagger file or Postman collection)
-strix -t ./openapi.yaml -t https://api.example.com
+halo -t ./openapi.yaml -t https://api.example.com
 
 # Postman collection pulled live by id (+ optional environment)
-strix -t "postman://<collection-uuid>?env=<environment-uuid>"
+halo -t "postman://<collection-uuid>?env=<environment-uuid>"
 
 # Targets from a file
-strix --target-list ./targets.txt
+halo --target-list ./targets.txt
 
 # Extra files placed in the sandbox workspace
-strix --target ./my-project --workspace-file ./wordlist.txt
-strix --target https://app.com --workspace-file ./openapi.yaml:specs/openapi.yaml
+halo --target ./my-project --workspace-file ./wordlist.txt
+halo --target https://app.com --workspace-file ./openapi.yaml:specs/openapi.yaml
 ```
 
 ## Exit Codes

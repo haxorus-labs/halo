@@ -7,11 +7,11 @@ from typing import Any
 import pytest
 from agents import ModelSettings
 
-import strix.tools.notes.tools as notes_tools
-import strix.tools.todo.tools as todo_tools
-from strix.core import runner
-from strix.core.agents import AgentCoordinator
-from strix.runtime import session_manager
+import halo.tools.notes.tools as notes_tools
+import halo.tools.todo.tools as todo_tools
+from halo.core import runner
+from halo.core.agents import AgentCoordinator
+from halo.runtime import session_manager
 
 
 def _wire_runner(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
@@ -50,7 +50,7 @@ def _wire_runner(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
     monkeypatch.setattr(runner, "build_root_task", lambda _scan_config: "task")
     monkeypatch.setattr(runner, "build_scope_context", lambda _scan_config: "")
     monkeypatch.setattr(runner, "make_model_settings", lambda *_a, **_k: ModelSettings())
-    monkeypatch.setattr(runner, "build_strix_agent", lambda **_kwargs: object())
+    monkeypatch.setattr(runner, "build_halo_agent", lambda **_kwargs: object())
     monkeypatch.setattr(runner, "make_child_factory", lambda **_kwargs: lambda **_k: object())
     monkeypatch.setattr(runner, "open_agent_session", lambda _root_id, _db: object())
 
@@ -75,7 +75,7 @@ async def test_user_interrupt_leaves_the_root_running_for_resume(
     coordinator = AgentCoordinator()
 
     with pytest.raises(interrupt):
-        await runner.run_strix_scan(
+        await runner.run_halo_scan(
             scan_config={"targets": [], "scan_mode": "deep"},
             scan_id="scan-test",
             image="img",
@@ -98,7 +98,7 @@ async def test_a_real_crash_still_marks_root_failed(
     coordinator = AgentCoordinator()
 
     with pytest.raises(RuntimeError, match="boom"):
-        await runner.run_strix_scan(
+        await runner.run_halo_scan(
             scan_config={"targets": [], "scan_mode": "deep"},
             scan_id="scan-test",
             image="img",

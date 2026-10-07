@@ -29,10 +29,10 @@ from openai.types.responses import (
     ResponseOutputText,
 )
 
-from strix.config import codex, loader
-from strix.config.loader import load_settings
-from strix.config.models import StrixProvider, _NonStreamingModel, _TurnGuardModel
-from strix.llm.request_log import RequestLoggingModel
+from halo.config import codex, loader
+from halo.config.loader import load_settings
+from halo.config.models import HaloProvider, _NonStreamingModel, _TurnGuardModel
+from halo.llm.request_log import RequestLoggingModel
 
 
 if TYPE_CHECKING:
@@ -284,7 +284,7 @@ class _DummyModel(Model):
 
 @pytest.fixture
 def _reset_settings(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    for key in ("STRIX_LLM", "LLM_DISABLE_STREAMING"):
+    for key in ("HALO_LLM", "LLM_DISABLE_STREAMING"):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setattr(loader, "_cached", None)
     monkeypatch.setattr(loader, "_override", None)
@@ -295,11 +295,11 @@ def test_get_model_wraps_when_disabled(
     monkeypatch: pytest.MonkeyPatch, _reset_settings: None
 ) -> None:
     inner = _DummyModel()
-    monkeypatch.setattr("strix.config.models.MultiProvider.get_model", lambda *_: inner)
+    monkeypatch.setattr("halo.config.models.MultiProvider.get_model", lambda *_: inner)
     monkeypatch.setenv("LLM_DISABLE_STREAMING", "true")
     load_settings()
 
-    model = StrixProvider().get_model("openai/gpt-4o-mini")
+    model = HaloProvider().get_model("openai/gpt-4o-mini")
     assert isinstance(model, _TurnGuardModel)
     assert isinstance(model._inner, _NonStreamingModel)
 
@@ -308,10 +308,10 @@ def test_get_model_keeps_streaming_by_default(
     monkeypatch: pytest.MonkeyPatch, _reset_settings: None
 ) -> None:
     inner = _DummyModel()
-    monkeypatch.setattr("strix.config.models.MultiProvider.get_model", lambda *_: inner)
+    monkeypatch.setattr("halo.config.models.MultiProvider.get_model", lambda *_: inner)
     load_settings()
 
-    model = StrixProvider().get_model("openai/gpt-4o-mini")
+    model = HaloProvider().get_model("openai/gpt-4o-mini")
     assert isinstance(model, _TurnGuardModel)
     assert isinstance(model._inner, RequestLoggingModel)
     assert model._inner._inner is inner
@@ -327,6 +327,6 @@ def test_get_model_guards_subscription_model_but_keeps_it_streaming(
     monkeypatch.setenv("LLM_DISABLE_STREAMING", "true")
     load_settings()
 
-    model = StrixProvider().get_model("gpt-5.5")
+    model = HaloProvider().get_model("gpt-5.5")
     assert isinstance(model, _TurnGuardModel)
     assert not isinstance(model._inner, _NonStreamingModel)

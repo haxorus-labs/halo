@@ -7,11 +7,11 @@ from typing import Any
 import pytest
 from agents import ModelSettings
 
-import strix.tools.notes.tools as notes_tools
-import strix.tools.todo.tools as todo_tools
-from strix.core import runner
-from strix.core.agents import AgentCoordinator
-from strix.runtime import session_manager
+import halo.tools.notes.tools as notes_tools
+import halo.tools.todo.tools as todo_tools
+from halo.core import runner
+from halo.core.agents import AgentCoordinator
+from halo.runtime import session_manager
 
 
 def _wire_runner(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
@@ -38,7 +38,7 @@ def _wire_runner(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
     monkeypatch.setattr(runner, "build_root_task", lambda _c: "task")
     monkeypatch.setattr(runner, "build_scope_context", lambda _c: "")
     monkeypatch.setattr(runner, "make_model_settings", lambda *_a, **_k: ModelSettings())
-    monkeypatch.setattr(runner, "build_strix_agent", lambda **_k: object())
+    monkeypatch.setattr(runner, "build_halo_agent", lambda **_k: object())
     monkeypatch.setattr(runner, "make_child_factory", lambda **_k: lambda **_kk: object())
     monkeypatch.setattr(runner, "open_agent_session", lambda _root_id, _db: object())
 
@@ -81,7 +81,7 @@ async def test_a_live_child_is_settled_before_sessions_close(
 
     monkeypatch.setattr(runner, "run_agent_loop", _root_finishes)
 
-    await runner.run_strix_scan(
+    await runner.run_halo_scan(
         scan_config={"targets": [], "scan_mode": "deep"},
         scan_id="scan-test",
         image="img",
@@ -111,7 +111,7 @@ async def test_missing_finish_is_logged_only_when_root_did_not_complete(
 
     monkeypatch.setattr(runner, "run_agent_loop", _root_ends_with_text)
 
-    await runner.run_strix_scan(
+    await runner.run_halo_scan(
         scan_config={"targets": [], "scan_mode": "deep"},
         scan_id="scan-test",
         image="img",

@@ -13,10 +13,10 @@ import pytest
 import requests
 from rich.console import Console
 
-from strix.interface import cloud, platform_cli
-from strix.interface.cloud import http, render, runner, source_scan
-from strix.interface.cloud.source_upload import prepare_source
-from strix.interface.main import main as interface_main
+from halo.interface import cloud, platform_cli
+from halo.interface.cloud import http, render, runner, source_scan
+from halo.interface.cloud.source_upload import prepare_source
+from halo.interface.main import main as interface_main
 
 
 if TYPE_CHECKING:
@@ -54,7 +54,7 @@ class FakeResponse:
 
 @pytest.fixture(autouse=True)
 def _token(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("STRIX_API_TOKEN", "runtime-test-token")
+    monkeypatch.setenv("HALO_API_TOKEN", "runtime-test-token")
 
 
 def _console_output(data: Any, *, view: str | None = None, width: int = 160) -> str:
@@ -92,7 +92,7 @@ def test_scan_lists_flatten_actionable_targets_findings_and_ids(width: int) -> N
                     "status": "running",
                     "repositories": [
                         {
-                            "url": "https://github.com/usestrix/strix",
+                            "url": "https://github.com/usehalo/halo",
                             "branch": "feature",
                             "provider": "github",
                         }
@@ -117,7 +117,7 @@ def test_scan_lists_flatten_actionable_targets_findings_and_ids(width: int) -> N
         width=width,
     )
     for value in (
-        "https://github.com/usestrix/strix @ feature",
+        "https://github.com/usehalo/halo @ feature",
         "https://staging.example.test",
         "running",
         "completed",
@@ -170,7 +170,7 @@ def test_connector_enrollment_command_is_complete_multiline_and_terminal_safe(
         "docker run --rm \\\n"
         "  -e TS_AUTHKEY=tskey-" + "a" * 180 + " \\\n"
         "  -e LABEL=before\x1b]52;c;copied\x07after \\\n"
-        "  ghcr.io/usestrix/connector:latest"
+        "  ghcr.io/usehalo/connector:latest"
     )
     monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
     monkeypatch.setattr(
@@ -184,7 +184,7 @@ def test_connector_enrollment_command_is_complete_multiline_and_terminal_safe(
     assert cloud.run_cloud(["connectors", "get", "connector-1", "--include-command"]) == 0
     output = capsys.readouterr().out
     assert "TS_AUTHKEY=tskey-" + "a" * 180 in output
-    assert "ghcr.io/usestrix/connector:latest" in output
+    assert "ghcr.io/usehalo/connector:latest" in output
     assert "\\x0a" not in output
     assert "\x1b" not in output
     assert "\\x1b]52;c;copied\\x07" in output
@@ -208,13 +208,13 @@ def test_pr_detail_summarizes_nested_findings() -> None:
     output = _console_output(
         {
             "id": "review-1",
-            "repository_full_name": "usestrix/strix",
+            "repository_full_name": "usehalo/halo",
             "pr_number": 1177,
             "findings": findings,
         },
         view="GET /pr-reviews/{reviewId}",
     )
-    assert "usestrix/strix" in output
+    assert "usehalo/halo" in output
     assert "Finding 0" in output
     assert "7 more; use --json" in output
     assert "Finding 11" not in output
@@ -467,7 +467,7 @@ def test_redirected_session_argument_errors_are_json_only(command: str, capsys: 
     assert cloud.run_cloud([command, "--bogus"]) == http.EXIT_USAGE
     captured = capsys.readouterr()
     payload = json.loads(captured.out)
-    assert f"strix cloud {command}" in payload["error"]
+    assert f"halo cloud {command}" in payload["error"]
     assert captured.err == ""
 
 
@@ -763,7 +763,7 @@ def test_wait_interruption_returns_130_with_remote_operation_id(
 def test_session_help_is_specific_and_human_whoami_shows_scopes(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: Any
 ) -> None:
-    monkeypatch.delenv("STRIX_API_TOKEN", raising=False)
+    monkeypatch.delenv("HALO_API_TOKEN", raising=False)
     monkeypatch.setattr(platform_cli, "AUTH_PATH", tmp_path / "auth.json")
     platform_cli.save_record(
         {
@@ -776,7 +776,7 @@ def test_session_help_is_specific_and_human_whoami_shows_scopes(
     monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
     assert cloud.run_cloud(["whoami", "--help"]) == 0
     who_help = capsys.readouterr().out
-    assert "strix cloud whoami" in who_help
+    assert "halo cloud whoami" in who_help
     assert "--no-browser" not in who_help
     assert cloud.run_cloud(["whoami", "--show-scopes"]) == 0
     assert "scans:read organizations:read" in capsys.readouterr().out
@@ -785,7 +785,7 @@ def test_session_help_is_specific_and_human_whoami_shows_scopes(
 def test_non_tty_whoami_and_logout_emit_json(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: Any
 ) -> None:
-    monkeypatch.delenv("STRIX_API_TOKEN", raising=False)
+    monkeypatch.delenv("HALO_API_TOKEN", raising=False)
     monkeypatch.setattr(platform_cli, "AUTH_PATH", tmp_path / "auth.json")
     monkeypatch.setattr(sys.stdout, "isatty", lambda: False)
     platform_cli.save_record(
@@ -853,13 +853,13 @@ def test_login_workspace_selector_prefers_ids_and_rejects_duplicate_names() -> N
     console = Console(file=io.StringIO())
     organizations = [
         {"id": "org_1", "name": "org_2"},
-        {"id": "org_2", "name": "Strix"},
-        {"id": "org_3", "name": "Strix"},
+        {"id": "org_2", "name": "Halo"},
+        {"id": "org_3", "name": "Halo"},
     ]
 
     assert platform_cli._choose_workspace(console, organizations, "org_2")["id"] == "org_2"
     with pytest.raises(platform_cli.PlatformAuthError, match="org_2, org_3"):
-        platform_cli._choose_workspace(console, organizations, "Strix")
+        platform_cli._choose_workspace(console, organizations, "Halo")
 
 
 def test_device_flow_slow_down_never_exceeds_the_poll_interval_cap(
@@ -929,7 +929,7 @@ def test_device_flow_accepts_external_authkit_url_and_binds_token_origin(
             ),
             FakeResponse(
                 {
-                    "api_token": "strix_pat_test",
+                    "api_token": "halo_pat_test",
                     "organization_id": "org-1",
                     "scopes": ["scans:read"],
                 }
@@ -937,7 +937,7 @@ def test_device_flow_accepts_external_authkit_url_and_binds_token_origin(
         ]
     )
     monkeypatch.setattr(requests, "post", lambda *_a, **_k: next(responses))
-    monkeypatch.setattr(platform_cli, "_app_url", lambda: "https://preview.strix.ai")
+    monkeypatch.setattr(platform_cli, "_app_url", lambda: "https://preview.halo.ai")
     monkeypatch.setattr(time, "sleep", lambda _seconds: None)
 
     record = platform_cli._run_device_flow(
@@ -946,14 +946,14 @@ def test_device_flow_accepts_external_authkit_url_and_binds_token_origin(
         scopes=["scans:read"],
     )
 
-    assert record["app_url"] == "https://preview.strix.ai"
+    assert record["app_url"] == "https://preview.halo.ai"
     assert record["requested_scopes"] == ["scans:read"]
 
 
 def test_missing_verb_json_is_structured(capsys: Any) -> None:
     assert cloud.run_cloud(["uploads", "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
-    assert payload["command"] == "strix cloud uploads"
+    assert payload["command"] == "halo cloud uploads"
     assert any(item["name"] == "request" for item in payload["verbs"])
 
 
@@ -976,11 +976,11 @@ def test_root_help_accepts_json_before_help_and_leaf_help_stays_specific(
     capsys: Any,
 ) -> None:
     assert cloud.run_cloud(["--json", "--help"]) == 0
-    assert json.loads(capsys.readouterr().out)["command"] == "strix cloud"
+    assert json.loads(capsys.readouterr().out)["command"] == "halo cloud"
 
     assert cloud.run_cloud(["scans", "get", "scan-1", "-h"]) == 0
     leaf_help = capsys.readouterr().out
-    assert "strix cloud scans get" in leaf_help
+    assert "halo cloud scans get" in leaf_help
     assert "scans verbs" not in leaf_help
 
 
@@ -990,17 +990,17 @@ def test_non_tty_dispatcher_always_emits_structured_json(
     monkeypatch.setattr(sys.stdout, "isatty", lambda: False)
 
     assert cloud.run_cloud([]) == 0
-    assert json.loads(capsys.readouterr().out)["command"] == "strix cloud"
+    assert json.loads(capsys.readouterr().out)["command"] == "halo cloud"
 
     assert cloud.run_cloud(["uploads"]) == 0
-    assert json.loads(capsys.readouterr().out)["command"] == "strix cloud uploads"
+    assert json.loads(capsys.readouterr().out)["command"] == "halo cloud uploads"
 
     assert cloud.run_cloud(["does-not-exist"]) == http.EXIT_USAGE
     assert json.loads(capsys.readouterr().out) == {"error": "unknown command: does-not-exist"}
 
     assert cloud.run_cloud(["scans", "does-not-exist"]) == http.EXIT_USAGE
     payload = json.loads(capsys.readouterr().out)
-    assert payload["command"] == "strix cloud scans"
+    assert payload["command"] == "halo cloud scans"
     assert payload["error"] == "unknown verb"
 
 
@@ -1010,7 +1010,7 @@ def test_non_tty_dispatcher_always_emits_structured_json(
         "http://project.supabase.co/storage/v1/object/upload/sign/bucket/file",
         "https://127.0.0.1/storage/v1/object/upload/sign/bucket/file",
         "https://10.0.0.1/storage/v1/object/upload/sign/bucket/file",
-        "https://app.strix.ai@127.0.0.1/storage/v1/object/upload/sign/bucket/file",
+        "https://app.halo.ai@127.0.0.1/storage/v1/object/upload/sign/bucket/file",
         "https://evil.example/storage/v1/object/upload/sign/bucket/file",
         "https://project.supabase.co.evil/storage/v1/object/upload/sign/bucket/file",
         "https://project.supabase.co/not-storage/file",
@@ -1021,7 +1021,7 @@ def test_source_upload_rejects_untrusted_destinations_before_reading_file(
 ) -> None:
     source = tmp_path / "approved.zip"
     source.write_bytes(b"approved source")
-    monkeypatch.setattr(http, "_app_url_override", "https://app.strix.ai")
+    monkeypatch.setattr(http, "_app_url_override", "https://app.halo.ai")
     monkeypatch.setattr(
         requests,
         "put",
@@ -1036,12 +1036,12 @@ def test_source_upload_rejects_untrusted_destinations_before_reading_file(
     "app_url,signed_url",
     [
         (
-            "https://app.strix.ai",
+            "https://app.halo.ai",
             "https://project-ref.supabase.co/storage/v1/object/upload/sign/bucket/file?token=signed%2Fvalue",
         ),
         (
-            "https://strix.corp.internal",
-            "https://strix.corp.internal/storage/v1/object/upload/sign/bucket/file",
+            "https://halo.corp.internal",
+            "https://halo.corp.internal/storage/v1/object/upload/sign/bucket/file",
         ),
         (
             "http://127.0.0.1:3000",
@@ -1082,7 +1082,7 @@ def test_source_upload_refuses_redirects_without_following_them(
         request_options.update(kwargs)
         return response
 
-    monkeypatch.setattr(http, "_app_url_override", "https://app.strix.ai")
+    monkeypatch.setattr(http, "_app_url_override", "https://app.halo.ai")
     monkeypatch.setattr(requests, "put", put)
 
     with pytest.raises(http.CloudError, match="unexpected redirect"):
@@ -1102,7 +1102,7 @@ def test_one_time_api_token_has_save_now_warning(
     monkeypatch.setattr(
         http,
         "request",
-        lambda *_a, **_k: FakeResponse({"id": "token-1", "token": "strix_pat_once"}),
+        lambda *_a, **_k: FakeResponse({"id": "token-1", "token": "halo_pat_once"}),
     )
     assert cloud.run_cloud(["tokens", "create", "--type", "personal", "--name", "test"]) == 0
     output = capsys.readouterr().out
@@ -1113,10 +1113,10 @@ def test_one_time_api_token_has_save_now_warning(
 def test_root_help_advertises_cloud_and_completions(
     monkeypatch: pytest.MonkeyPatch, capsys: Any
 ) -> None:
-    monkeypatch.setattr(sys, "argv", ["strix", "--help"])
+    monkeypatch.setattr(sys, "argv", ["halo", "--help"])
     with pytest.raises(SystemExit) as raised:
         interface_main()
     assert raised.value.code == 0
     output = capsys.readouterr().out
-    assert "strix cloud" in output
-    assert "strix completions" in output
+    assert "halo cloud" in output
+    assert "halo completions" in output

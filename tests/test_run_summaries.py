@@ -6,7 +6,7 @@ import json
 import os
 from typing import TYPE_CHECKING
 
-from strix.report.runs import list_run_summaries
+from halo.report.runs import list_run_summaries
 
 
 if TYPE_CHECKING:
@@ -39,7 +39,7 @@ def _write_run(
 
 
 def test_lists_runs_newest_first_with_target_status_and_findings(tmp_path: Path) -> None:
-    base = tmp_path / "strix_runs"
+    base = tmp_path / "halo_runs"
     _write_run(
         base,
         "example-com_1111",
@@ -83,7 +83,7 @@ def test_lists_runs_newest_first_with_target_status_and_findings(tmp_path: Path)
 
 
 def test_target_less_runs_describe_their_workspace_or_instruction(tmp_path: Path) -> None:
-    base = tmp_path / "strix_runs"
+    base = tmp_path / "halo_runs"
     _write_run(
         base,
         "pentest_aaaa",
@@ -106,7 +106,7 @@ def test_target_less_runs_describe_their_workspace_or_instruction(tmp_path: Path
 def test_runs_without_agent_state_or_with_a_broken_record_are_listed_not_resumable(
     tmp_path: Path,
 ) -> None:
-    base = tmp_path / "strix_runs"
+    base = tmp_path / "halo_runs"
     _write_run(base, "no-state_cccc", {"status": "failed"}, modified=2_000, state=False)
     _write_run(base, "broken_dddd", "{not json", modified=1_000)
     _write_run(base, "list_eeee", "[]", modified=500)
@@ -130,7 +130,7 @@ def test_blank_instruction_does_not_break_the_listing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    run_dir = tmp_path / "strix_runs" / "blank_0001"
+    run_dir = tmp_path / "halo_runs" / "blank_0001"
     run_dir.mkdir(parents=True)
     (run_dir / "run.json").write_text(
         json.dumps({"status": "completed", "instruction": "  \n  "}), encoding="utf-8"
@@ -142,7 +142,7 @@ def test_blank_instruction_does_not_break_the_listing(
 
 
 def test_title_is_the_instruction_else_the_most_severe_finding(tmp_path: Path) -> None:
-    base = tmp_path / "strix_runs"
+    base = tmp_path / "halo_runs"
     _write_run(
         base, "instructed_1111", {"user_instruction": "focus on auth\nand billing"}, modified=2
     )

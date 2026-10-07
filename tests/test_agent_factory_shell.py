@@ -9,8 +9,8 @@ from typing import Any, cast
 import pytest
 from agents.tool import CustomTool, FunctionTool
 
-from strix.agents import factory
-from strix.config import load_settings
+from halo.agents import factory
+from halo.config import load_settings
 
 
 def _capturing_exec_tool(captured: dict[str, str]) -> FunctionTool:
@@ -111,7 +111,7 @@ async def test_chat_completions_filesystem_custom_tool_becomes_function_tool() -
 
 
 def test_function_tools_are_result_bounded() -> None:
-    agent = factory.build_strix_agent(is_root=True)
+    agent = factory.build_halo_agent(is_root=True)
     by_name = {t.name: t for t in agent.tools}
 
-    assert getattr(by_name["think"], "_strix_bounded", False) is True
+    assert getattr(by_name["think"], "_halo_bounded", False) is True

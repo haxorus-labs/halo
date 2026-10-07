@@ -8,16 +8,16 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from strix.core import execution
-from strix.core.agents import AgentCoordinator
-from strix.core.execution import _start_child_runner, run_agent_loop
-from strix.core.hooks import (
+from halo.core import execution
+from halo.core.agents import AgentCoordinator
+from halo.core.execution import _start_child_runner, run_agent_loop
+from halo.core.hooks import (
     BudgetExceededError,
     BudgetPausedError,
     ReportUsageHooks,
     recomputed_budget_flags,
 )
-from strix.core.sessions import open_agent_session
+from halo.core.sessions import open_agent_session
 
 
 if TYPE_CHECKING:
@@ -172,7 +172,7 @@ class _Scan:
 
     async def start_root(self, *, calls: int) -> None:
         self.ledger.remaining["root"] = calls
-        await self.coordinator.register("root", "strix", parent_id=None)
+        await self.coordinator.register("root", "halo", parent_id=None)
         session = open_agent_session("root", self.db_path)
         self.sessions.append(session)
         self.root_task = asyncio.create_task(
@@ -230,7 +230,7 @@ async def test_pause_policy_parks_every_agent_at_the_limit_and_resumes_in_place(
     scan = _Scan(tmp_path, monkeypatch, max_budget_usd=5.0)
     agents = ("root", "child-a", "child-b")
 
-    with patch("strix.core.hooks.get_global_report_state", return_value=scan.ledger):
+    with patch("halo.core.hooks.get_global_report_state", return_value=scan.ledger):
         await scan.start_root(calls=100)
         await scan.start_child("child-a", calls=100)
         await scan.start_child("child-b", calls=100)
@@ -285,7 +285,7 @@ async def test_pause_policy_operator_pause_and_resume_without_a_limit(
     scan = _Scan(tmp_path, monkeypatch, max_budget_usd=None)
     agents = ("root", "child-a", "child-b")
 
-    with patch("strix.core.hooks.get_global_report_state", return_value=scan.ledger):
+    with patch("halo.core.hooks.get_global_report_state", return_value=scan.ledger):
         await scan.start_root(calls=6)
         await scan.start_child("child-a", calls=6)
         await scan.start_child("child-b", calls=6)
@@ -323,9 +323,9 @@ async def test_pause_policy_keeps_in_flight_overshoot(
 ) -> None:
     scan = _Scan(tmp_path, monkeypatch, max_budget_usd=1.0)
     scan.ledger.gate = asyncio.Event()
-    await scan.coordinator.register("root", "strix", parent_id=None)
+    await scan.coordinator.register("root", "halo", parent_id=None)
 
-    with patch("strix.core.hooks.get_global_report_state", return_value=scan.ledger):
+    with patch("halo.core.hooks.get_global_report_state", return_value=scan.ledger):
         await scan.start_child("child-a", calls=100)
         await scan.start_child("child-b", calls=100)
 
@@ -354,7 +354,7 @@ async def test_pause_policy_keeps_in_flight_overshoot(
 async def test_resume_between_park_decision_and_wait_is_not_missed() -> None:
     coordinator = AgentCoordinator()
     coordinator.set_budget_policy("pause")
-    await coordinator.register("a", "strix", parent_id=None)
+    await coordinator.register("a", "halo", parent_id=None)
 
     parked_epoch = coordinator.resume_epoch
     await coordinator.park_for_budget("a")
@@ -371,7 +371,7 @@ async def test_resume_between_park_decision_and_wait_is_not_missed() -> None:
 async def test_parked_wait_returns_on_stop_signals() -> None:
     coordinator = AgentCoordinator()
     coordinator.set_budget_policy("pause")
-    await coordinator.register("a", "strix", parent_id=None)
+    await coordinator.register("a", "halo", parent_id=None)
     await coordinator.register("b", "recon", parent_id="a")
     await coordinator.park_for_budget("a")
     await coordinator.park_for_budget("b")
@@ -400,7 +400,7 @@ async def test_parked_wait_returns_on_stop_signals() -> None:
 async def test_park_never_overwrites_a_stop_that_landed_first() -> None:
     coordinator = AgentCoordinator()
     coordinator.set_budget_policy("pause")
-    await coordinator.register("a", "strix", parent_id=None)
+    await coordinator.register("a", "halo", parent_id=None)
 
     parked_epoch = coordinator.resume_epoch
     await coordinator.request_stop("a")
@@ -417,7 +417,7 @@ async def test_park_never_overwrites_a_stop_that_landed_first() -> None:
 async def test_parked_children_keep_the_scan_open() -> None:
     coordinator = AgentCoordinator()
     coordinator.set_budget_policy("pause")
-    await coordinator.register("root", "strix", parent_id=None)
+    await coordinator.register("root", "halo", parent_id=None)
     await coordinator.register("child", "recon", parent_id="root")
     assert await coordinator.park_for_budget("child") is True
 
@@ -459,7 +459,7 @@ async def test_pause_hooks_never_warn_and_park_only_at_the_limit() -> None:
     coordinator = AgentCoordinator()
     coordinator.set_budget_policy("pause")
 
-    with patch("strix.core.hooks.get_global_report_state", return_value=ledger):
+    with patch("halo.core.hooks.get_global_report_state", return_value=ledger):
         for cost in (7.0, 8.5, 9.5, 9.99):
             ledger.cost = cost
             for parent_id in (None, "root"):
@@ -499,7 +499,7 @@ async def test_pause_hooks_do_not_count_a_parked_turn() -> None:
     hooks = ReportUsageHooks(model="m", max_budget_usd=10.0, budget_policy="pause")
     coordinator = AgentCoordinator()
     ctx = _ctx(coordinator)
-    with patch("strix.core.hooks.get_global_report_state", return_value=ledger):
+    with patch("halo.core.hooks.get_global_report_state", return_value=ledger):
         with pytest.raises(BudgetPausedError):
             await hooks.on_llm_start(ctx, MagicMock(), None, [])
         assert "llm_turn" not in ctx.context
@@ -514,7 +514,7 @@ async def test_stop_policy_is_unchanged() -> None:
     hooks = ReportUsageHooks(model="m", max_budget_usd=10.0)
     assert hooks.budget_policy == "stop"
 
-    with patch("strix.core.hooks.get_global_report_state", return_value=ledger):
+    with patch("halo.core.hooks.get_global_report_state", return_value=ledger):
         ledger.cost = 7.0
         items: list[Any] = []
         await hooks.on_llm_start(_ctx(None), MagicMock(), None, items)

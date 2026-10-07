@@ -40,7 +40,7 @@ def test_provider_modules_import(module: str) -> None:
 
 
 def test_pyinstaller_spec_bundles_google_auth() -> None:
-    spec = (ROOT / "strix.spec").read_text(encoding="utf-8")
+    spec = (ROOT / "halo.spec").read_text(encoding="utf-8")
     assert "collect_submodules('google.auth')" in spec
     assert "'google.auth'," not in spec
     assert "'google.oauth2'," not in spec

@@ -7,9 +7,9 @@ from typing import TYPE_CHECKING, Any
 import pytest
 import requests
 
-from strix.config.settings import IntegrationSettings
-from strix.interface.environment import _missing_web_search_vars
-from strix.tools.web_search import tool
+from halo.config.settings import IntegrationSettings
+from halo.interface.environment import _missing_web_search_vars
+from halo.tools.web_search import tool
 
 
 if TYPE_CHECKING:
@@ -48,7 +48,7 @@ def test_explicit_exa_ignores_a_configured_perplexity_key() -> None:
     integrations = IntegrationSettings(
         PERPLEXITY_API_KEY="pk",
         EXA_API_KEY="ek",
-        STRIX_WEB_SEARCH_PROVIDER="exa",
+        HALO_WEB_SEARCH_PROVIDER="exa",
     )
     assert tool._resolve_provider(integrations) == ("exa", "ek")
 
@@ -57,7 +57,7 @@ def test_explicit_perplexity_ignores_a_configured_exa_key() -> None:
     integrations = IntegrationSettings(
         PERPLEXITY_API_KEY="pk",
         EXA_API_KEY="ek",
-        STRIX_WEB_SEARCH_PROVIDER="perplexity",
+        HALO_WEB_SEARCH_PROVIDER="perplexity",
     )
     assert tool._resolve_provider(integrations) == ("perplexity", "pk")
 
@@ -65,7 +65,7 @@ def test_explicit_perplexity_ignores_a_configured_exa_key() -> None:
 def test_explicit_exa_without_a_key_names_only_exa() -> None:
     integrations = IntegrationSettings(
         PERPLEXITY_API_KEY="pk",
-        STRIX_WEB_SEARCH_PROVIDER="exa",
+        HALO_WEB_SEARCH_PROVIDER="exa",
     )
     resolved = tool._resolve_provider(integrations)
     assert isinstance(resolved, dict)
@@ -163,10 +163,10 @@ def test_do_search_reports_empty_exa_results_as_unexpected(
         ({}, ["EXA_API_KEY", "PERPLEXITY_API_KEY"]),
         ({"EXA_API_KEY": "ek"}, []),
         ({"PERPLEXITY_API_KEY": "pk"}, []),
-        ({"STRIX_WEB_SEARCH_PROVIDER": "exa", "PERPLEXITY_API_KEY": "pk"}, ["EXA_API_KEY"]),
-        ({"STRIX_WEB_SEARCH_PROVIDER": "exa", "EXA_API_KEY": "ek"}, []),
-        ({"STRIX_WEB_SEARCH_PROVIDER": "perplexity", "EXA_API_KEY": "ek"}, ["PERPLEXITY_API_KEY"]),
-        ({"STRIX_WEB_SEARCH_PROVIDER": "perplexity", "PERPLEXITY_API_KEY": "pk"}, []),
+        ({"HALO_WEB_SEARCH_PROVIDER": "exa", "PERPLEXITY_API_KEY": "pk"}, ["EXA_API_KEY"]),
+        ({"HALO_WEB_SEARCH_PROVIDER": "exa", "EXA_API_KEY": "ek"}, []),
+        ({"HALO_WEB_SEARCH_PROVIDER": "perplexity", "EXA_API_KEY": "ek"}, ["PERPLEXITY_API_KEY"]),
+        ({"HALO_WEB_SEARCH_PROVIDER": "perplexity", "PERPLEXITY_API_KEY": "pk"}, []),
     ],
 )
 def test_environment_validation_follows_provider_rules(
@@ -184,8 +184,8 @@ def test_exa_search_type_and_num_results_are_configurable(
     class _Settings:
         integrations = IntegrationSettings(
             EXA_API_KEY="ek",
-            STRIX_EXA_SEARCH_TYPE="deep-reasoning",
-            STRIX_EXA_NUM_RESULTS=3,
+            HALO_EXA_SEARCH_TYPE="deep-reasoning",
+            HALO_EXA_NUM_RESULTS=3,
         )
 
     def fake_post(_url: str, **kwargs: Any) -> _FakeResponse:
@@ -291,7 +291,7 @@ def test_do_get_contents_refuses_a_perplexity_pinned_provider(
         integrations = IntegrationSettings(
             EXA_API_KEY="ek",
             PERPLEXITY_API_KEY="pk",
-            STRIX_WEB_SEARCH_PROVIDER="perplexity",
+            HALO_WEB_SEARCH_PROVIDER="perplexity",
         )
 
     monkeypatch.setattr(tool, "load_settings", _Settings)

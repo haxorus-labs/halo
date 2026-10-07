@@ -7,9 +7,9 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from strix.agents.factory import _BASE_TOOLS
-from strix.tools.threat_model import tools as threat_model_tools
-from strix.tools.threat_model.tools import (
+from halo.agents.factory import _BASE_TOOLS
+from halo.tools.threat_model import tools as threat_model_tools
+from halo.tools.threat_model.tools import (
     _amend_impl,
     _get_impl,
     _save_impl,
@@ -82,7 +82,7 @@ def test_missing_model_reports_not_found(tmp_path: Path) -> None:
 def test_saved_model_round_trips(tmp_path: Path) -> None:
     repo = _make_repo(tmp_path)
 
-    assert _save_impl(str(repo), _MODEL, "Strix")["success"] is True
+    assert _save_impl(str(repo), _MODEL, "Halo")["success"] is True
     result = _get_impl(str(repo))
 
     assert result["found"] is True

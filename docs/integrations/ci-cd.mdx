@@ -1,22 +1,22 @@
 ---
 title: "CI/CD Integration"
-description: "Run Strix in any CI/CD pipeline"
+description: "Run Halo in any CI/CD pipeline"
 ---
 
-Strix runs in headless mode for automated pipelines.
+Halo runs in headless mode for automated pipelines.
 
 ## Headless Mode
 
 Use the `-n` or `--non-interactive` flag:
 
 ```bash
-strix -n --target ./app --scan-mode quick
+halo -n --target ./app --scan-mode quick
 ```
 
-For pull-request style CI runs, Strix automatically scopes quick scans to changed files. You can force this behavior and set a base ref explicitly:
+For pull-request style CI runs, Halo automatically scopes quick scans to changed files. You can force this behavior and set a base ref explicitly:
 
 ```bash
-strix -n --target ./app --scan-mode quick --scope-mode diff --diff-base origin/main
+halo -n --target ./app --scan-mode quick --scope-mode diff --diff-base origin/main
 ```
 
 ## Exit Codes
@@ -30,7 +30,7 @@ strix -n --target ./app --scan-mode quick --scope-mode diff --diff-base origin/m
 To fail only on serious findings, pass `--fail-on` with a minimum severity. Lower findings are still reported but exit `0`, so a passing job does not mean the report is empty.:
 
 ```bash
-strix -n --target ./app --scan-mode quick --fail-on high
+halo -n --target ./app --scan-mode quick --fail-on high
 ```
 
 ## GitLab CI
@@ -41,11 +41,11 @@ security-scan:
   services:
     - docker:dind
   variables:
-    STRIX_LLM: $STRIX_LLM
+    HALO_LLM: $HALO_LLM
     LLM_API_KEY: $LLM_API_KEY
   script:
-    - curl -sSL https://strix.ai/install | bash
-    - strix -n -t ./ --scan-mode quick
+    - curl -sSL https://halo.ai/install | bash
+    - halo -n -t ./ --scan-mode quick
 ```
 
 ## Jenkins
@@ -54,14 +54,14 @@ security-scan:
 pipeline {
     agent any
     environment {
-        STRIX_LLM = credentials('strix-llm')
+        HALO_LLM = credentials('halo-llm')
         LLM_API_KEY = credentials('llm-api-key')
     }
     stages {
         stage('Security Scan') {
             steps {
-                sh 'curl -sSL https://strix.ai/install | bash'
-                sh 'strix -n -t ./ --scan-mode quick'
+                sh 'curl -sSL https://halo.ai/install | bash'
+                sh 'halo -n -t ./ --scan-mode quick'
             }
         }
     }
@@ -80,11 +80,11 @@ jobs:
       - checkout
       - setup_remote_docker
       - run:
-          name: Install Strix
-          command: curl -sSL https://strix.ai/install | bash
+          name: Install Halo
+          command: curl -sSL https://halo.ai/install | bash
       - run:
           name: Run Scan
-          command: strix -n -t ./ --scan-mode quick
+          command: halo -n -t ./ --scan-mode quick
 ```
 
 <Note>

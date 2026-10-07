@@ -13,10 +13,10 @@ from agents.exceptions import UserError
 from mcp.shared.exceptions import McpError
 from mcp.types import ErrorData
 
-from strix.tools.mcp import BearerAuth, McpConnectionConfig
-from strix.tools.mcp import client as mcp_client
-from strix.tools.mcp import session as mcp_session
-from strix.tools.mcp.failures import FailureInfo, HttpStatusRecorder, classify
+from halo.tools.mcp import BearerAuth, McpConnectionConfig
+from halo.tools.mcp import client as mcp_client
+from halo.tools.mcp import session as mcp_session
+from halo.tools.mcp.failures import FailureInfo, HttpStatusRecorder, classify
 
 
 _test_mcp_client = importlib.import_module("tests.test_mcp_client")
@@ -197,7 +197,7 @@ async def test_server_exhaustion_quarantines_then_revives(
     monkeypatch.setattr(mcp_session, "_retry_delay", _zero_delay)
     monkeypatch.setattr(asyncio, "sleep", _no_sleep)
     clock = [100.0]
-    monkeypatch.setattr("strix.tools.mcp.session.time.monotonic", lambda: clock[0])
+    monkeypatch.setattr("halo.tools.mcp.session.time.monotonic", lambda: clock[0])
     builds = iter(
         [
             _sequence_server("quarantine", _http_error(500)),
@@ -231,7 +231,7 @@ async def test_success_resets_quarantine_strikes(
     monkeypatch.setattr(mcp_session, "_retry_delay", _zero_delay)
     monkeypatch.setattr(asyncio, "sleep", _no_sleep)
     clock = [100.0]
-    monkeypatch.setattr("strix.tools.mcp.session.time.monotonic", lambda: clock[0])
+    monkeypatch.setattr("halo.tools.mcp.session.time.monotonic", lambda: clock[0])
     builds = iter(
         [
             _sequence_server("strikes", _http_error(500)),
@@ -340,7 +340,7 @@ async def test_list_tools_during_quarantine_reports_temporary_state(
     monkeypatch.setattr(mcp_session, "_retry_delay", _zero_delay)
     monkeypatch.setattr(asyncio, "sleep", _no_sleep)
     clock = [100.0]
-    monkeypatch.setattr("strix.tools.mcp.session.time.monotonic", lambda: clock[0])
+    monkeypatch.setattr("halo.tools.mcp.session.time.monotonic", lambda: clock[0])
     builds = iter([_sequence_server("cooldown", _http_error(500)) for _ in range(3)])
     monkeypatch.setattr(mcp_client, "_build_server", lambda _config: _built_server(next(builds)))
     session = mcp_session.SupervisedMcpSession(_config("cooldown"))

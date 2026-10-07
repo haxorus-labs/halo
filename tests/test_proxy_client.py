@@ -14,8 +14,8 @@ from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
-from strix.runtime.caido_handle import CaidoBootstrapHandle
-from strix.tools.proxy import caido_api, tools
+from halo.runtime.caido_handle import CaidoBootstrapHandle
+from halo.tools.proxy import caido_api, tools
 
 
 if TYPE_CHECKING:

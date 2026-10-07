@@ -1,6 +1,6 @@
 ---
 title: "Quick Start"
-description: "Install Strix and run your first security scan"
+description: "Install Halo and run your first security scan"
 ---
 
 ## Prerequisites
@@ -13,12 +13,12 @@ description: "Install Strix and run your first security scan"
 <Tabs>
   <Tab title="curl">
     ```bash
-    curl -sSL https://strix.ai/install | bash
+    curl -sSL https://halo.ai/install | bash
     ```
   </Tab>
   <Tab title="pipx">
     ```bash
-    pipx install strix-agent
+    pipx install halo-agent
     ```
   </Tab>
 </Tabs>
@@ -28,7 +28,7 @@ description: "Install Strix and run your first security scan"
 Set your LLM provider:
 
 ```bash
-export STRIX_LLM="openrouter/z-ai/glm-5.3"
+export HALO_LLM="openrouter/z-ai/glm-5.3"
 export LLM_API_KEY="your-api-key"
 ```
 
@@ -39,32 +39,32 @@ For best results, use `openrouter/z-ai/glm-5.3` (the default pick), `openai/gpt-
 ## Run Your First Scan
 
 ```bash
-strix --target ./your-app
+halo --target ./your-app
 ```
 
 <Note>
-First run pulls the Docker sandbox image automatically. Results are saved to `strix_runs/<run-name>`.
+First run pulls the Docker sandbox image automatically. Results are saved to `halo_runs/<run-name>`.
 </Note>
 
 ## Target Types
 
-Strix accepts multiple target types:
+Halo accepts multiple target types:
 
 ```bash
 # Local codebase
-strix --target ./app-directory
+halo --target ./app-directory
 
 # GitHub repository
-strix --target https://github.com/org/repo
+halo --target https://github.com/org/repo
 
 # Live web application
-strix --target https://your-app.com
+halo --target https://your-app.com
 
 # Multiple targets (white-box testing)
-strix -t https://github.com/org/repo -t https://your-app.com
+halo -t https://github.com/org/repo -t https://your-app.com
 
 # Targets from a file, one target per non-empty, non-comment line
-strix --target-list ./targets.txt
+halo --target-list ./targets.txt
 ```
 
 ## Next Steps

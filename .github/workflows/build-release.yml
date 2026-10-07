@@ -55,31 +55,31 @@ jobs:
       - name: Build
         shell: bash
         env:
-          STRIX_WHEEL_PLATFORM_TAG: ${{ matrix.wheel-platform }}
+          HALO_WHEEL_PLATFORM_TAG: ${{ matrix.wheel-platform }}
         run: |
           uv sync --frozen
           uv build --wheel
-          uv run python -c 'import glob, os, sys, zipfile; wheels = glob.glob("dist/*.whl"); assert len(wheels) == 1, wheels; archive = zipfile.ZipFile(wheels[0]); tui = "strix/bin/strix-tui.exe" if sys.platform == "win32" else "strix/bin/strix-tui"; assert tui in archive.namelist(); metadata = archive.read(next(name for name in archive.namelist() if name.endswith(".dist-info/WHEEL"))).decode(); assert "Root-Is-Purelib: false" in metadata; assert "Tag: py3-none-" + os.environ["STRIX_WHEEL_PLATFORM_TAG"] in metadata'
+          uv run python -c 'import glob, os, sys, zipfile; wheels = glob.glob("dist/*.whl"); assert len(wheels) == 1, wheels; archive = zipfile.ZipFile(wheels[0]); tui = "halo/bin/halo-tui.exe" if sys.platform == "win32" else "halo/bin/halo-tui"; assert tui in archive.namelist(); metadata = archive.read(next(name for name in archive.namelist() if name.endswith(".dist-info/WHEEL"))).decode(); assert "Root-Is-Purelib: false" in metadata; assert "Tag: py3-none-" + os.environ["HALO_WHEEL_PLATFORM_TAG"] in metadata'
 
-          uv run pyinstaller strix.spec --noconfirm
+          uv run pyinstaller halo.spec --noconfirm
 
           if [[ "${{ runner.os }}" == "Windows" ]]; then
-            PYI_BINARY="dist/strix.exe"
-            TUI_NAME="strix-tui.exe"
-            dist/strix.exe --version
+            PYI_BINARY="dist/halo.exe"
+            TUI_NAME="halo-tui.exe"
+            dist/halo.exe --version
           else
-            PYI_BINARY="dist/strix"
-            TUI_NAME="strix-tui"
-            dist/strix --version
+            PYI_BINARY="dist/halo"
+            TUI_NAME="halo-tui"
+            dist/halo --version
           fi
           uv run pyi-archive_viewer -l -r "$PYI_BINARY" > archive.txt
-          grep -E "strix[/\\]+bin[/\\]+$TUI_NAME" archive.txt >/dev/null
+          grep -E "halo[/\\]+bin[/\\]+$TUI_NAME" archive.txt >/dev/null
           grep -E "'google\.auth\.transport\.requests'" archive.txt >/dev/null
           grep -E "'boto3\.session'" archive.txt >/dev/null
 
           if [[ "${{ matrix.target }}" == "linux-arm64" ]]; then
-            file dist/strix
-            file dist/strix | grep -q "ARM aarch64" || {
+            file dist/halo
+            file dist/halo | grep -q "ARM aarch64" || {
               echo "::error::linux-arm64 artifact is not an ARM aarch64 binary"
               exit 1
             }
@@ -89,17 +89,17 @@ jobs:
           mkdir -p dist/release
 
           if [[ "${{ runner.os }}" == "Windows" ]]; then
-            cp dist/strix.exe "dist/release/strix-${VERSION}-${{ matrix.target }}.exe"
-            (cd dist/release && 7z a "strix-${VERSION}-${{ matrix.target }}.zip" "strix-${VERSION}-${{ matrix.target }}.exe")
+            cp dist/halo.exe "dist/release/halo-${VERSION}-${{ matrix.target }}.exe"
+            (cd dist/release && 7z a "halo-${VERSION}-${{ matrix.target }}.zip" "halo-${VERSION}-${{ matrix.target }}.exe")
           else
-            cp dist/strix "dist/release/strix-${VERSION}-${{ matrix.target }}"
-            chmod +x "dist/release/strix-${VERSION}-${{ matrix.target }}"
-            tar -C dist/release -czvf "dist/release/strix-${VERSION}-${{ matrix.target }}.tar.gz" "strix-${VERSION}-${{ matrix.target }}"
+            cp dist/halo "dist/release/halo-${VERSION}-${{ matrix.target }}"
+            chmod +x "dist/release/halo-${VERSION}-${{ matrix.target }}"
+            tar -C dist/release -czvf "dist/release/halo-${VERSION}-${{ matrix.target }}.tar.gz" "halo-${VERSION}-${{ matrix.target }}"
           fi
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         with:
-          name: strix-${{ matrix.target }}
+          name: halo-${{ matrix.target }}
           path: |
             dist/release/*.tar.gz
             dist/release/*.zip

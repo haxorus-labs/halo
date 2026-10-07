@@ -15,9 +15,9 @@ from openai import (
     RateLimitError,
 )
 
-from strix.config import codex
-from strix.core import execution
-from strix.core.agents import AgentCoordinator
+from halo.config import codex
+from halo.core import execution
+from halo.core.agents import AgentCoordinator
 
 
 def _request() -> httpx.Request:
@@ -121,7 +121,7 @@ async def _run_once(
     monkeypatch.setattr(Runner, "run_streamed", _fake_run_streamed)
 
     coordinator = AgentCoordinator()
-    await coordinator.register("root", "strix", parent_id=None)
+    await coordinator.register("root", "halo", parent_id=None)
 
     result = await execution._run_cycle(
         object(),

@@ -1,6 +1,6 @@
-# Contributing to Strix
+# Contributing to Halo
 
-Thank you for your interest in contributing to Strix! This guide will help you get started with development and contributions.
+Thank you for your interest in contributing to Halo! This guide will help you get started with development and contributions.
 
 ## 🚀 Development Setup
 
@@ -16,8 +16,8 @@ Thank you for your interest in contributing to Strix! This guide will help you g
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/usestrix/strix.git
-   cd strix
+   git clone https://github.com/usehalo/halo.git
+   cd halo
    ```
 
 2. **Install development dependencies**
@@ -31,18 +31,18 @@ Thank you for your interest in contributing to Strix! This guide will help you g
 
 3. **Configure your LLM provider**
    ```bash
-   export STRIX_LLM="openrouter/z-ai/glm-5.3"
+   export HALO_LLM="openrouter/z-ai/glm-5.3"
    export LLM_API_KEY="your-api-key"
    ```
 
-4. **Run Strix in development mode**
+4. **Run Halo in development mode**
    ```bash
-   uv run strix --target https://example.com
+   uv run halo --target https://example.com
    ```
 
 ## 📚 Contributing Skills
 
-Skills are specialized knowledge packages that enhance agent capabilities. See [strix/skills/README.md](strix/skills/README.md) for detailed guidelines.
+Skills are specialized knowledge packages that enhance agent capabilities. See [halo/skills/README.md](halo/skills/README.md) for detailed guidelines.
 
 ### Quick Guide
 
@@ -84,7 +84,7 @@ Skills are specialized knowledge packages that enhance agent capabilities. See [
 When reporting bugs, please include:
 
 - Python version and OS
-- Strix version
+- Halo version
 - LLMs being used
 - Full error traceback
 - Steps to reproduce
@@ -102,17 +102,17 @@ We welcome feature ideas! Please:
 
 ## 🖥️ Local viewer SPA
 
-`strix view` serves a prebuilt web UI whose source lives in
-`strix/interface/viewer/frontend/` (a Vite + React project) and whose built output is
-committed to `strix/interface/viewer/static/` and shipped in the package. End users never
-run a JS build. If you change anything under `strix/interface/viewer/frontend/`, rebuild
+`halo view` serves a prebuilt web UI whose source lives in
+`halo/interface/viewer/frontend/` (a Vite + React project) and whose built output is
+committed to `halo/interface/viewer/static/` and shipped in the package. End users never
+run a JS build. If you change anything under `halo/interface/viewer/frontend/`, rebuild
 and commit the output:
 
 ```bash
-make viewer   # or: cd strix/interface/viewer/frontend && npm ci && npm run build
+make viewer   # or: cd halo/interface/viewer/frontend && npm ci && npm run build
 ```
 
-Commit both the source change and the regenerated `strix/interface/viewer/static/`.
+Commit both the source change and the regenerated `halo/interface/viewer/static/`.
 
 ## Package builds
 
@@ -125,15 +125,15 @@ make wheel
 ```
 
 The build hook (`scripts/tui_sidecar_hook.py`) compiles the sidecar, embeds it as
-`strix/bin/strix-tui`, and assigns the current platform tag. It requires Go
+`halo/bin/halo-tui`, and assigns the current platform tag. It requires Go
 1.24.x or newer and fails rather than producing a wheel without the sidecar.
-`scripts/build.sh` and `strix.spec` are likewise strict for frozen PyInstaller
+`scripts/build.sh` and `halo.spec` are likewise strict for frozen PyInstaller
 releases.
 
 ## 🤝 Community
 
-- **Discord**: [Join our community](https://discord.gg/strix-ai)
-- **Issues**: [GitHub Issues](https://github.com/usestrix/strix/issues)
+- **Discord**: [Join our community](https://discord.gg/halo-ai)
+- **Issues**: [GitHub Issues](https://github.com/usehalo/halo/issues)
 
 ## ✨ Recognition
 
@@ -144,4 +144,4 @@ We value all contributions! Contributors will be:
 
 ---
 
-**Questions?** Reach out on [Discord](https://discord.gg/strix-ai) or create an issue. We're here to help!
+**Questions?** Reach out on [Discord](https://discord.gg/halo-ai) or create an issue. We're here to help!

@@ -1,5 +1,5 @@
 # Built viewer bundles are generated output, not hand-edited source.
-exclude: ^strix/interface/viewer/static/assets/
+exclude: ^halo/interface/viewer/static/assets/
 
 repos:
   # Ruff for fast linting and formatting
@@ -22,7 +22,7 @@ repos:
         entry: uv run mypy
         language: system
         types_or: [python, pyi]
-        files: ^(strix|tests)/
+        files: ^(halo|tests)/
         require_serial: true
 
   # Built-in hooks for basic file checks

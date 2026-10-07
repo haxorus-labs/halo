@@ -14,7 +14,7 @@ from typing import Any
 
 import pytest
 
-from strix.runtime.caido_bootstrap import bootstrap_caido
+from halo.runtime.caido_bootstrap import bootstrap_caido
 
 
 class _FakeExecResult:

@@ -1,4 +1,4 @@
-"""Tests for the local run viewer (strix.interface.viewer) and its path helpers."""
+"""Tests for the local run viewer (halo.interface.viewer) and its path helpers."""
 
 from __future__ import annotations
 
@@ -10,10 +10,10 @@ import urllib.request
 from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 
-from strix.core.paths import latest_run_dir, runs_base_dir
-from strix.interface.viewer.cli import _state_label, run_view
-from strix.interface.viewer.server import serve
-from strix.interface.viewer.transcript import (
+from halo.core.paths import latest_run_dir, runs_base_dir
+from halo.interface.viewer.cli import _state_label, run_view
+from halo.interface.viewer.server import serve
+from halo.interface.viewer.transcript import (
     build_run_state,
     read_report_markdown,
     read_run_summary,
@@ -29,14 +29,14 @@ if TYPE_CHECKING:
 
 
 def _make_run(base: Path, name: str, *, status: str, end_time: str | None) -> Path:
-    run_dir = base / "strix_runs" / name
+    run_dir = base / "halo_runs" / name
     state_dir = run_dir / ".state"
     state_dir.mkdir(parents=True)
     record = {"run_name": name, "status": status, "end_time": end_time}
     (run_dir / "run.json").write_text(json.dumps(record), encoding="utf-8")
     agents = {
         "statuses": {"root": "completed", "child": "running"},
-        "names": {"root": "strix", "child": "recon"},
+        "names": {"root": "halo", "child": "recon"},
         "parent_of": {"root": None, "child": "root"},
     }
     (state_dir / "agents.json").write_text(json.dumps(agents), encoding="utf-8")
@@ -46,7 +46,7 @@ def _make_run(base: Path, name: str, *, status: str, end_time: str | None) -> Pa
 def test_latest_run_dir_none_when_no_runs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
     assert latest_run_dir() is None
-    assert runs_base_dir() == tmp_path / "strix_runs"
+    assert runs_base_dir() == tmp_path / "halo_runs"
 
 
 def test_view_cli_help_includes_host(capsys: pytest.CaptureFixture[str]) -> None:
@@ -224,7 +224,7 @@ def test_server_serves_api_and_static(tmp_path: Path, monkeypatch: pytest.Monkey
     (assets / "assets").mkdir(parents=True)
     (assets / "index.html").write_text("<!doctype html><div id=root></div>", encoding="utf-8")
     (assets / "assets" / "app.js").write_text("console.log(1)", encoding="utf-8")
-    monkeypatch.setattr("strix.interface.viewer.server.bundle_dir", lambda: assets)
+    monkeypatch.setattr("halo.interface.viewer.server.bundle_dir", lambda: assets)
 
     httpd, url, token = serve(run_dir, open_browser=False)
     try:
@@ -257,11 +257,11 @@ def test_server_event_endpoint_forwards_cta(
     assets = tmp_path / "bundle"
     assets.mkdir()
     (assets / "index.html").write_text("x", encoding="utf-8")
-    monkeypatch.setattr("strix.interface.viewer.server.bundle_dir", lambda: assets)
+    monkeypatch.setattr("halo.interface.viewer.server.bundle_dir", lambda: assets)
 
     seen: list[tuple[str, str | None]] = []
     monkeypatch.setattr(
-        "strix.telemetry.posthog.viewer_cta_clicked",
+        "halo.telemetry.posthog.viewer_cta_clicked",
         lambda cta, surface=None: seen.append((cta, surface)),
     )
 
@@ -288,11 +288,11 @@ def test_server_event_endpoint_forwards_email_funnel(
     assets = tmp_path / "bundle"
     assets.mkdir()
     (assets / "index.html").write_text("x", encoding="utf-8")
-    monkeypatch.setattr("strix.interface.viewer.server.bundle_dir", lambda: assets)
+    monkeypatch.setattr("halo.interface.viewer.server.bundle_dir", lambda: assets)
 
     seen: list[tuple[str, str | None]] = []
     monkeypatch.setattr(
-        "strix.telemetry.posthog.viewer_email_event",
+        "halo.telemetry.posthog.viewer_email_event",
         lambda step, purpose=None: seen.append((step, purpose)),
     )
 
@@ -323,7 +323,7 @@ def test_server_event_endpoint_forwards_agent_steered(
     _bundle(tmp_path, monkeypatch)
 
     seen: list[bool] = []
-    monkeypatch.setattr("strix.telemetry.posthog.viewer_agent_steered", lambda: seen.append(True))
+    monkeypatch.setattr("halo.telemetry.posthog.viewer_agent_steered", lambda: seen.append(True))
 
     httpd, url, _ = serve(run_dir, open_browser=False)
     try:
@@ -347,9 +347,9 @@ def test_feedback_records_telemetry_on_success(
     _bundle(tmp_path, monkeypatch)
 
     sent: list[bool] = []
-    monkeypatch.setattr("strix.interface.viewer.auth.feedback_submit", lambda *_a: None)
+    monkeypatch.setattr("halo.interface.viewer.auth.feedback_submit", lambda *_a: None)
     monkeypatch.setattr(
-        "strix.telemetry.posthog.viewer_feedback_submitted", lambda: sent.append(True)
+        "halo.telemetry.posthog.viewer_feedback_submitted", lambda: sent.append(True)
     )
 
     httpd, url, token = serve(run_dir, open_browser=False)
@@ -398,7 +398,7 @@ def _session_cookie(url: str, token: str) -> str:
 
 def _cookie_name(url: str) -> str:
     """The per-server session cookie name, derived from the bound port."""
-    return f"strix_viewer_session_{urlsplit(url).port}"
+    return f"halo_viewer_session_{urlsplit(url).port}"
 
 
 def _get_status(url: str, *, cookie: str | None = None) -> int:
@@ -415,7 +415,7 @@ def _bundle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     assets = tmp_path / "bundle"
     assets.mkdir()
     (assets / "index.html").write_text("<!doctype html><div id=root></div>", encoding="utf-8")
-    monkeypatch.setattr("strix.interface.viewer.server.bundle_dir", lambda: assets)
+    monkeypatch.setattr("halo.interface.viewer.server.bundle_dir", lambda: assets)
 
 
 def test_capability_issued_only_for_tokened_bootstrap(
@@ -426,7 +426,7 @@ def test_capability_issued_only_for_tokened_bootstrap(
     (assets / "assets").mkdir(parents=True)
     (assets / "index.html").write_text("<!doctype html>index", encoding="utf-8")
     (assets / "assets" / "app.js").write_text("1", encoding="utf-8")
-    monkeypatch.setattr("strix.interface.viewer.server.bundle_dir", lambda: assets)
+    monkeypatch.setattr("halo.interface.viewer.server.bundle_dir", lambda: assets)
 
     httpd, url, token = serve(run_dir, open_browser=False)
     try:
@@ -503,10 +503,10 @@ def test_auth_status_reflects_expiry(tmp_path: Path, monkeypatch: pytest.MonkeyP
     run_dir = _make_run(tmp_path, "status", status="running", end_time=None)
     _bundle(tmp_path, monkeypatch)
     monkeypatch.setattr(
-        "strix.interface.viewer.auth.read_auth", lambda: {"email": "a@b.com", "token": "t"}
+        "halo.interface.viewer.auth.read_auth", lambda: {"email": "a@b.com", "token": "t"}
     )
     verified = {"value": True}
-    monkeypatch.setattr("strix.interface.viewer.auth.is_verified", lambda: verified["value"])
+    monkeypatch.setattr("halo.interface.viewer.auth.is_verified", lambda: verified["value"])
 
     httpd, url, token = serve(run_dir, open_browser=False)
     try:
@@ -532,7 +532,7 @@ def test_auth_mutations_require_session(tmp_path: Path, monkeypatch: pytest.Monk
     run_dir = _make_run(tmp_path, "authmut", status="running", end_time=None)
     _bundle(tmp_path, monkeypatch)
     forgotten = {"value": False}
-    monkeypatch.setattr("strix.interface.viewer.auth.forget", lambda: forgotten.update(value=True))
+    monkeypatch.setattr("halo.interface.viewer.auth.forget", lambda: forgotten.update(value=True))
 
     httpd, url, _ = serve(run_dir, open_browser=False)
     try:
@@ -581,7 +581,7 @@ def test_report_send_requires_session_cookie(
 
     # A verified machine token exists, but that alone must not authorize a caller.
     monkeypatch.setattr(
-        "strix.interface.viewer.auth.read_auth", lambda: {"email": "a@b.com", "token": "t"}
+        "halo.interface.viewer.auth.read_auth", lambda: {"email": "a@b.com", "token": "t"}
     )
 
     httpd, url, token = serve(run_dir, open_browser=False)
@@ -607,7 +607,7 @@ def test_report_send_rejects_live_run(tmp_path: Path, monkeypatch: pytest.Monkey
     run_dir = _make_run(tmp_path, "live", status="running", end_time=None)
     _bundle(tmp_path, monkeypatch)
     monkeypatch.setattr(
-        "strix.interface.viewer.auth.read_auth", lambda: {"email": "a@b.com", "token": "t"}
+        "halo.interface.viewer.auth.read_auth", lambda: {"email": "a@b.com", "token": "t"}
     )
 
     httpd, url, token = serve(run_dir, open_browser=False)
@@ -627,7 +627,7 @@ def test_historical_run_data_requires_verification(
     _bundle(tmp_path, monkeypatch)
 
     verified = {"value": False}
-    monkeypatch.setattr("strix.interface.viewer.auth.is_verified", lambda: verified["value"])
+    monkeypatch.setattr("halo.interface.viewer.auth.is_verified", lambda: verified["value"])
 
     httpd, url, token = serve(launched, open_browser=False)
     try:
@@ -660,7 +660,7 @@ def test_runs_list_requires_session_and_verification(
     _make_run(tmp_path, "other", status="completed", end_time="2026-01-01T00:00:00Z")
     _bundle(tmp_path, monkeypatch)
 
-    monkeypatch.setattr("strix.interface.viewer.auth.is_verified", lambda: True)
+    monkeypatch.setattr("halo.interface.viewer.auth.is_verified", lambda: True)
 
     def _runs(cookie: str | None) -> dict[str, object]:
         headers = {"Cookie": cookie} if cookie else {}
@@ -696,9 +696,9 @@ def test_concurrent_servers_use_distinct_cookies(
     run_b = _make_run(tmp_path / "b", "run-b", status="running", end_time=None)
     _bundle(tmp_path, monkeypatch)
     monkeypatch.setattr(
-        "strix.interface.viewer.auth.read_auth", lambda: {"email": "a@b.com", "token": "t"}
+        "halo.interface.viewer.auth.read_auth", lambda: {"email": "a@b.com", "token": "t"}
     )
-    monkeypatch.setattr("strix.interface.viewer.auth.is_verified", lambda: True)
+    monkeypatch.setattr("halo.interface.viewer.auth.is_verified", lambda: True)
 
     httpd_a, url_a, token_a = serve(run_a, open_browser=False)
     httpd_b, url_b, token_b = serve(run_b, open_browser=False)
@@ -741,7 +741,7 @@ def test_server_rejects_path_traversal(tmp_path: Path, monkeypatch: pytest.Monke
     assets = tmp_path / "bundle"
     assets.mkdir()
     (assets / "index.html").write_text("<!doctype html>index", encoding="utf-8")
-    monkeypatch.setattr("strix.interface.viewer.server.bundle_dir", lambda: assets)
+    monkeypatch.setattr("halo.interface.viewer.server.bundle_dir", lambda: assets)
 
     httpd, url, _ = serve(run_dir, open_browser=False)
     try:

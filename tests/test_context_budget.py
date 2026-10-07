@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from strix.config import load_settings
-from strix.llm import context_budget
+from halo.config import load_settings
+from halo.llm import context_budget
 
 
 if TYPE_CHECKING:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from strix.interface.completions import completion_candidates, run_completions
+from halo.interface.completions import completion_candidates, run_completions
 
 
 def test_root_completion_candidates() -> None:

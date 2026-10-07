@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from strix.tools.coverage.tools import _record_impl, hydrate_coverage_from_disk
-from strix.tools.finish.tool import _coverage_summary
+from halo.tools.coverage.tools import _record_impl, hydrate_coverage_from_disk
+from halo.tools.finish.tool import _coverage_summary
 
 
 if TYPE_CHECKING:

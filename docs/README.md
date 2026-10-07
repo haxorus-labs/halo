@@ -1,6 +1,6 @@
-# Strix Documentation
+# Halo Documentation
 
-Documentation source files for Strix, powered by [Mintlify](https://mintlify.com).
+Documentation source files for Halo, powered by [Mintlify](https://mintlify.com).
 
 ## Local Preview
 

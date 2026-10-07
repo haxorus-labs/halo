@@ -1,4 +1,4 @@
-"""Tests for the Stripe Link wallet setup path of `strix cloud billing topup`."""
+"""Tests for the Stripe Link wallet setup path of `halo cloud billing topup`."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
 
-from strix.interface.cloud import billing
+from halo.interface.cloud import billing
 
 
 if TYPE_CHECKING:

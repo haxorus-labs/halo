@@ -7,9 +7,9 @@ from typing import Any
 import pytest
 import requests
 
-from strix.report.state import ReportState
-from strix.telemetry import posthog, report_error, scarf, set_scan_phase
-from strix.telemetry._common import exception_props
+from halo.report.state import ReportState
+from halo.telemetry import posthog, report_error, scarf, set_scan_phase
+from halo.telemetry._common import exception_props
 
 
 PRIVATE_MESSAGE = "private message that must stay on the machine"

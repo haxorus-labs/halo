@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 import requests
 
-from strix.interface.cloud import payment_proxy
+from halo.interface.cloud import payment_proxy
 
 
 if TYPE_CHECKING:
@@ -56,7 +56,7 @@ def test_bridge_bounds_decompressed_upstream_response(monkeypatch: pytest.Monkey
 
     with payment_proxy.wallet_payment_bridge(
         upstream_url="https://app.example.test/api/v1/billing/topup",
-        api_token="strix-secret",  # noqa: S106
+        api_token="halo-secret",  # noqa: S106
         expected_body=b"{}",
     ) as wallet_url:
         request = urllib.request.Request(  # noqa: S310
@@ -85,7 +85,7 @@ def test_bridge_forwards_only_the_approved_request_and_protected_headers(
     monkeypatch.setattr(requests, "request", fake_request)
     with payment_proxy.wallet_payment_bridge(
         upstream_url="https://app.example.test/api/v1/billing/topup",
-        api_token="strix-secret",  # noqa: S106
+        api_token="halo-secret",  # noqa: S106
         workspace_id="org_trusted",
         expected_body=b'{"credits":5}',
         response_observer=observed.append,
@@ -96,16 +96,16 @@ def test_bridge_forwards_only_the_approved_request_and_protected_headers(
             {
                 "Authorization": "Payment wallet-proof",
                 "Proxy-Authorization": "Basic drop-me",
-                "X-Strix-Authorization": "Bearer attacker",
-                "X-Strix-Workspace": "org_attacker",
+                "X-Halo-Authorization": "Bearer attacker",
+                "X-Halo-Workspace": "org_attacker",
             },
         )
 
         assert result == b'{"ok":true}'
         headers = captured[0]["headers"]
         assert headers["Authorization"] == "Payment wallet-proof"
-        assert headers["X-Strix-Authorization"] == "Bearer strix-secret"
-        assert headers["X-Strix-Workspace"] == "org_trusted"
+        assert headers["X-Halo-Authorization"] == "Bearer halo-secret"
+        assert headers["X-Halo-Workspace"] == "org_trusted"
         assert "Proxy-Authorization" not in headers
         assert not any(name.lower() in {"host", "content-length"} for name in headers)
         assert observed == [
@@ -129,7 +129,7 @@ def test_bridge_limits_valid_wallet_attempts(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setattr(requests, "request", fake_request)
     with payment_proxy.wallet_payment_bridge(
         upstream_url="https://app.example.test/api/v1/billing/topup",
-        api_token="strix-secret",  # noqa: S106
+        api_token="halo-secret",  # noqa: S106
         expected_body=b"{}",
     ) as wallet_url:
         assert _post(wallet_url, b"{}") == b"{}"

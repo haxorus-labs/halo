@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from strix.core.inputs import build_root_task
-from strix.interface.utils import read_workspace_files, resolve_workspace_files
+from halo.core.inputs import build_root_task
+from halo.interface.utils import read_workspace_files, resolve_workspace_files
 
 
 if TYPE_CHECKING:

@@ -4,8 +4,8 @@ import asyncio
 
 import pytest
 
-from strix.config import Settings
-from strix.interface.scan_setup import check_header_safe_credentials, preflight_model_connection
+from halo.config import Settings
+from halo.interface.scan_setup import check_header_safe_credentials, preflight_model_connection
 
 
 _ENV_KEYS = (
@@ -13,8 +13,8 @@ _ENV_KEYS = (
     "OPENAI_API_KEY",
     "LLM_EXTRA_HEADERS",
     "LLM_API_BASE",
-    "STRIX_LLM",
-    "STRIX_DEDUPE_MODEL",
+    "HALO_LLM",
+    "HALO_DEDUPE_MODEL",
     "DEDUPE_LLM_API_KEY",
     "DEDUPE_LLM_EXTRA_HEADERS",
 )
@@ -77,7 +77,7 @@ def test_extra_header_value_is_checked(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_subscription_model_ignores_an_unused_main_key(monkeypatch: pytest.MonkeyPatch) -> None:
-    settings = _settings(monkeypatch, STRIX_LLM="chatgpt/gpt-5", LLM_API_KEY="sk-abc\u201d")
+    settings = _settings(monkeypatch, HALO_LLM="chatgpt/gpt-5", LLM_API_KEY="sk-abc\u201d")
 
     check_header_safe_credentials(settings)
 
@@ -85,7 +85,7 @@ def test_subscription_model_ignores_an_unused_main_key(monkeypatch: pytest.Monke
 def test_subscription_model_still_checks_extra_headers(monkeypatch: pytest.MonkeyPatch) -> None:
     settings = _settings(
         monkeypatch,
-        STRIX_LLM="chatgpt/gpt-5",
+        HALO_LLM="chatgpt/gpt-5",
         LLM_EXTRA_HEADERS='{"X-Team": "s\u00e9curit\u00e9"}',
     )
 
@@ -99,7 +99,7 @@ def test_dedupe_key_is_checked_when_a_dedupe_model_is_set(
     settings = _settings(
         monkeypatch,
         LLM_API_KEY="sk-plain",
-        STRIX_DEDUPE_MODEL="openai/gpt-4o-mini",
+        HALO_DEDUPE_MODEL="openai/gpt-4o-mini",
         DEDUPE_LLM_API_KEY="sk-de\u00a0dupe",
     )
 
@@ -113,7 +113,7 @@ def test_dedupe_key_is_checked_as_sent_after_resolve_dedupe_model_strips_it(
     settings = _settings(
         monkeypatch,
         LLM_API_KEY="sk-plain",
-        STRIX_DEDUPE_MODEL="openai/gpt-4o-mini",
+        HALO_DEDUPE_MODEL="openai/gpt-4o-mini",
         DEDUPE_LLM_API_KEY="\u00a0sk-dedupe\u00a0",
     )
 
@@ -126,7 +126,7 @@ def test_dedupe_subscription_model_checks_headers_but_not_the_key(
     settings = _settings(
         monkeypatch,
         LLM_API_KEY="sk-plain",
-        STRIX_DEDUPE_MODEL="chatgpt/gpt-5",
+        HALO_DEDUPE_MODEL="chatgpt/gpt-5",
         DEDUPE_LLM_API_KEY="sk-dedupe\u201d",
         DEDUPE_LLM_EXTRA_HEADERS='{"X-Team": "s\u00e9curit\u00e9"}',
     )

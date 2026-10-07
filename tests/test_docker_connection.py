@@ -11,15 +11,15 @@ from docker.errors import DockerException
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from urllib3.exceptions import ProtocolError
 
-from strix.runtime import backends, docker_connection
-from strix.runtime.docker_connection import (
+from halo.runtime import backends, docker_connection
+from halo.runtime.docker_connection import (
     DockerConnectionError,
     DockerEndpoint,
     resolve_docker_endpoint,
 )
 
 
-cli_utils: Any = importlib.import_module("strix.interface.utils")
+cli_utils: Any = importlib.import_module("halo.interface.utils")
 
 
 def _sdk_error(inner: BaseException) -> DockerException:
@@ -41,7 +41,7 @@ def test_docker_host_wins_over_context(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_current_context_is_used_like_the_cli(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(docker_connection, "get_current_context_name", lambda: "desktop-linux")
     monkeypatch.setattr(
-        "strix.runtime.docker_connection.ContextAPI.get_context",
+        "halo.runtime.docker_connection.ContextAPI.get_context",
         lambda _name: SimpleNamespace(
             Host="unix:///Users/me/.docker/run/docker.sock", TLSConfig=None
         ),
@@ -58,9 +58,7 @@ def test_default_context_uses_the_sdk_default(monkeypatch: pytest.MonkeyPatch) -
 
 def test_missing_or_broken_current_context_is_an_error(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(docker_connection, "get_current_context_name", lambda: "gone")
-    monkeypatch.setattr(
-        "strix.runtime.docker_connection.ContextAPI.get_context", lambda _name: None
-    )
+    monkeypatch.setattr("halo.runtime.docker_connection.ContextAPI.get_context", lambda _name: None)
     with pytest.raises(
         DockerConnectionError, match="docker context 'gone' is selected but does not exist"
     ):
@@ -69,7 +67,7 @@ def test_missing_or_broken_current_context_is_an_error(monkeypatch: pytest.Monke
     def boom(_name: str) -> None:
         raise DockerException("bad meta.json")
 
-    monkeypatch.setattr("strix.runtime.docker_connection.ContextAPI.get_context", boom)
+    monkeypatch.setattr("halo.runtime.docker_connection.ContextAPI.get_context", boom)
     with pytest.raises(DockerConnectionError, match="bad meta") as info:
         resolve_docker_endpoint({})
     assert info.value.endpoint.label == "docker context 'gone'"
@@ -84,12 +82,12 @@ def test_docker_host_goes_through_from_env_so_tls_settings_apply(
         lambda _environ=None: DockerEndpoint("tcp://10.0.0.5:2376", "DOCKER_HOST"),
     )
     client = object()
-    monkeypatch.setattr("strix.runtime.docker_connection.docker.from_env", lambda: client)
+    monkeypatch.setattr("halo.runtime.docker_connection.docker.from_env", lambda: client)
 
     def unexpected(**_kwargs: Any) -> None:
         raise AssertionError("DOCKER_HOST must not bypass from_env")
 
-    monkeypatch.setattr("strix.runtime.docker_connection.docker.DockerClient", unexpected)
+    monkeypatch.setattr("halo.runtime.docker_connection.docker.DockerClient", unexpected)
     assert docker_connection.connect_docker() is client
 
 
@@ -106,7 +104,7 @@ def test_context_endpoint_keeps_its_tls_config(monkeypatch: pytest.MonkeyPatch) 
         seen.update(kwargs)
         return "client"
 
-    monkeypatch.setattr("strix.runtime.docker_connection.docker.DockerClient", client)
+    monkeypatch.setattr("halo.runtime.docker_connection.docker.DockerClient", client)
     assert docker_connection.connect_docker() == "client"
     assert seen == {"base_url": "tcp://remote:2376", "tls": tls}
 
@@ -131,7 +129,7 @@ def test_connect_docker_surfaces_the_root_cause(
     def dead_client(**_kwargs: Any) -> None:
         raise _sdk_error(inner)
 
-    monkeypatch.setattr("strix.runtime.docker_connection.docker.DockerClient", dead_client)
+    monkeypatch.setattr("halo.runtime.docker_connection.docker.DockerClient", dead_client)
 
     with pytest.raises(DockerConnectionError) as info:
         docker_connection.connect_docker()
@@ -193,7 +191,7 @@ async def test_sandbox_backend_uses_the_same_endpoint(monkeypatch: pytest.Monkey
             captured["image"] = options.image
             return FakeSession()
 
-    monkeypatch.setattr("strix.runtime.docker_client.StrixDockerSandboxClient", FakeClient)
+    monkeypatch.setattr("halo.runtime.docker_client.HaloDockerSandboxClient", FakeClient)
 
     client, session = await backends._docker_backend(
         image="img:1", manifest=cast("Any", SimpleNamespace()), exposed_ports=(8080,)

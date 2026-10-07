@@ -1,11 +1,11 @@
-"""Tests for the SARIF 2.1.0 emitter in strix.report.sarif."""
+"""Tests for the SARIF 2.1.0 emitter in halo.report.sarif."""
 
 from __future__ import annotations
 
 import json
 from typing import TYPE_CHECKING, Any
 
-from strix.report.sarif import write_sarif
+from halo.report.sarif import write_sarif
 
 
 if TYPE_CHECKING:
@@ -38,7 +38,7 @@ def test_write_sarif_basic_shape(tmp_path: Path) -> None:
     assert doc["version"] == "2.1.0"
     assert "2.1.0" in doc["$schema"]
     run = doc["runs"][0]
-    assert run["tool"]["driver"]["name"] == "Strix"
+    assert run["tool"]["driver"]["name"] == "Halo"
     assert len(run["results"]) == 1
     loc = run["results"][0]["locations"][0]["physicalLocation"]
     assert loc["artifactLocation"]["uri"] == "app.py"
@@ -123,7 +123,7 @@ def test_write_sarif_never_embeds_poc_script(tmp_path: Path) -> None:
     assert marker not in raw
     assert "EXPLOIT-PAYLOAD-MARKER" not in raw
 
-    poc = _read(tmp_path)["runs"][0]["results"][0]["properties"]["strix"]["poc"]
+    poc = _read(tmp_path)["runs"][0]["results"][0]["properties"]["halo"]["poc"]
     assert poc["script_available"] is True
     assert "script" not in poc
     assert poc["description"] == "Send a crafted request to trigger the sink."
@@ -211,7 +211,7 @@ def test_write_sarif_emits_version_control_provenance(tmp_path: Path) -> None:
         },
     )
     run = _read(tmp_path)["runs"][0]
-    assert run["automationDetails"] == {"id": "strix/acme/widget"}
+    assert run["automationDetails"] == {"id": "halo/acme/widget"}
     provenance = run["versionControlProvenance"][0]
     assert provenance == {
         "repositoryUri": "https://github.com/acme/widget",
@@ -318,7 +318,7 @@ def test_coverage_results_declare_their_own_rules(tmp_path: Path) -> None:
     )
     run = _read(tmp_path)["runs"][0]
     rules = run["tool"]["driver"]["rules"]
-    coverage_rules = [rule for rule in rules if rule["id"].startswith("strix-coverage/")]
+    coverage_rules = [rule for rule in rules if rule["id"].startswith("halo-coverage/")]
 
     # Both entries share one rule, and every result's ruleIndex resolves to it.
     assert len(coverage_rules) == 1
@@ -364,10 +364,10 @@ def test_calibration_metadata_survives_into_result_properties(tmp_path: Path) ->
             )
         ],
     )
-    strix = _read(tmp_path)["runs"][0]["results"][0]["properties"]["strix"]
+    halo = _read(tmp_path)["runs"][0]["results"][0]["properties"]["halo"]
 
-    assert strix["confidence"] == "medium"
-    assert strix["counterevidence"] == "WAF blocks the naive payload."
-    assert strix["confidence_rationale"] == "Reproduced once out of three attempts."
-    assert strix["severity_change_conditions"] == "Critical if the WAF rule is removed."
-    assert strix["fix_verification"] == "Not retested."
+    assert halo["confidence"] == "medium"
+    assert halo["counterevidence"] == "WAF blocks the naive payload."
+    assert halo["confidence_rationale"] == "Reproduced once out of three attempts."
+    assert halo["severity_change_conditions"] == "Critical if the WAF rule is removed."
+    assert halo["fix_verification"] == "Not retested."

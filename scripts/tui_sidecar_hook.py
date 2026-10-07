@@ -26,7 +26,7 @@ class CustomBuildHook(BuildHookInterface):  # type: ignore[type-arg]
             return
 
         root = Path(self.root)
-        executable = "strix-tui.exe" if os.name == "nt" else "strix-tui"
+        executable = "halo-tui.exe" if os.name == "nt" else "halo-tui"
         output = root / "build" / "sidecar" / executable
         output.parent.mkdir(parents=True, exist_ok=True)
 
@@ -43,16 +43,16 @@ class CustomBuildHook(BuildHookInterface):  # type: ignore[type-arg]
                 "-ldflags=-s -w",
                 "-o",
                 str(output),
-                "./cmd/strix-tui",
+                "./cmd/halo-tui",
             ],
-            cwd=root / "strix" / "interface" / "tui",
+            cwd=root / "halo" / "interface" / "tui",
             env=env,
             check=True,
         )
 
-        build_data["force_include"][str(output)] = f"strix/bin/{executable}"
+        build_data["force_include"][str(output)] = f"halo/bin/{executable}"
         build_data["pure_python"] = False
-        platform_tag = os.environ.get("STRIX_WHEEL_PLATFORM_TAG")
+        platform_tag = os.environ.get("HALO_WHEEL_PLATFORM_TAG")
         if not platform_tag:
             platform_tag = sysconfig.get_platform().replace("-", "_").replace(".", "_")
         build_data["tag"] = f"py3-none-{platform_tag}"

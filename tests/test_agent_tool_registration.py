@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from agents.tool import FunctionTool
 
-from strix.agents import factory
+from halo.agents import factory
 
 
 if TYPE_CHECKING:
@@ -49,8 +49,8 @@ def test_registered_tools_appear_before_lifecycle_tool() -> None:
     tool = _tool("extra")
     factory.register_agent_tools(tool)
 
-    root = factory.build_strix_agent(is_root=True)
-    child = factory.build_strix_agent(is_root=False)
+    root = factory.build_halo_agent(is_root=True)
+    child = factory.build_halo_agent(is_root=False)
 
     root_names = [t.name for t in root.tools]
     child_names = [t.name for t in child.tools]
@@ -62,7 +62,7 @@ def test_registered_tools_appear_before_lifecycle_tool() -> None:
 def test_per_call_extra_tools_stack_with_registry() -> None:
     factory.register_agent_tools(_tool("registered"))
 
-    agent = factory.build_strix_agent(is_root=True, extra_tools=[_tool("per_call")])
+    agent = factory.build_halo_agent(is_root=True, extra_tools=[_tool("per_call")])
     names = [t.name for t in agent.tools]
 
     assert "registered" in names
@@ -81,19 +81,19 @@ def test_per_call_extra_tools_reject_duplicate_registered_names() -> None:
     factory.register_agent_tools(_tool("same_name"))
 
     with pytest.raises(ValueError, match="same_name"):
-        factory.build_strix_agent(is_root=True, extra_tools=[_tool("same_name")])
+        factory.build_halo_agent(is_root=True, extra_tools=[_tool("same_name")])
 
 
 def test_instructions_override_is_used_verbatim() -> None:
     custom = "You are a scan agent. Follow the provided scope."
 
-    agent = factory.build_strix_agent(is_root=True, instructions_override=custom)
+    agent = factory.build_halo_agent(is_root=True, instructions_override=custom)
 
     assert agent.instructions == custom
 
 
 def test_no_override_renders_builtin_prompt() -> None:
-    agent = factory.build_strix_agent(is_root=True)
+    agent = factory.build_halo_agent(is_root=True)
 
     assert isinstance(agent.instructions, str)
     assert agent.instructions != ""
@@ -101,8 +101,8 @@ def test_no_override_renders_builtin_prompt() -> None:
 
 def test_wait_for_user_is_interactive_only() -> None:
     """Yielding to the user is meaningless when no user is attached."""
-    interactive = factory.build_strix_agent(is_root=True, interactive=True)
-    autonomous = factory.build_strix_agent(is_root=True, interactive=False)
+    interactive = factory.build_halo_agent(is_root=True, interactive=True)
+    autonomous = factory.build_halo_agent(is_root=True, interactive=False)
 
     assert "wait_for_user" in [t.name for t in interactive.tools]
     assert "wait_for_user" not in [t.name for t in autonomous.tools]
@@ -110,13 +110,13 @@ def test_wait_for_user_is_interactive_only() -> None:
 
 def test_wait_for_agents_is_available_in_both_modes() -> None:
     for interactive in (True, False):
-        agent = factory.build_strix_agent(is_root=True, interactive=interactive)
+        agent = factory.build_halo_agent(is_root=True, interactive=interactive)
         assert "wait_for_agents" in [t.name for t in agent.tools]
 
 
 def test_strict_tool_schemas_can_be_disabled_per_route() -> None:
     """Claude routes cap strict tools; the toolset must be sendable without strict."""
-    agent = factory.build_strix_agent(is_root=True, strict_tool_schemas=False)
+    agent = factory.build_halo_agent(is_root=True, strict_tool_schemas=False)
 
     function_tools = [t for t in agent.tools if isinstance(t, FunctionTool)]
     assert function_tools
@@ -124,8 +124,8 @@ def test_strict_tool_schemas_can_be_disabled_per_route() -> None:
 
 
 def test_disabling_strict_leaves_shared_tools_untouched() -> None:
-    factory.build_strix_agent(is_root=True, strict_tool_schemas=False)
-    agent = factory.build_strix_agent(is_root=True)
+    factory.build_halo_agent(is_root=True, strict_tool_schemas=False)
+    agent = factory.build_halo_agent(is_root=True)
 
     assert any(t.strict_json_schema for t in agent.tools if isinstance(t, FunctionTool))
 

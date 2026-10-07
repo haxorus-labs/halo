@@ -7,9 +7,9 @@ import pytest
 from agents import RunConfig, Runner
 from openai import APIError, PermissionDeniedError
 
-from strix.core import execution
-from strix.core.agents import AgentCoordinator
-from strix.llm import request_log
+from halo.core import execution
+from halo.core.agents import AgentCoordinator
+from halo.llm import request_log
 
 
 if TYPE_CHECKING:
@@ -62,7 +62,7 @@ async def _run(
 
     monkeypatch.setattr(Runner, "run_streamed", _fake_run_streamed)
     coordinator = coordinator or AgentCoordinator()
-    await coordinator.register("root", "strix", parent_id=None)
+    await coordinator.register("root", "halo", parent_id=None)
     return await execution._run_cycle(
         object(),
         coordinator,

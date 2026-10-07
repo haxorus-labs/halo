@@ -25,7 +25,7 @@ updates:
           - patch
 
   - package-ecosystem: gomod
-    directory: /strix/interface/tui
+    directory: /halo/interface/tui
     schedule:
       interval: weekly
     cooldown:
@@ -37,7 +37,7 @@ updates:
           - patch
 
   - package-ecosystem: npm
-    directory: /strix/interface/viewer/frontend
+    directory: /halo/interface/viewer/frontend
     schedule:
       interval: weekly
     cooldown:

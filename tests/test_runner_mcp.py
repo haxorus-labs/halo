@@ -1,7 +1,7 @@
 """The runner attaches MCP connections source-agnostically.
 
 When a caller supplies ``mcp_connection_requests`` the runner attaches those;
-when it does not, the runner reads ``~/.strix/mcp-servers.json`` itself and wraps
+when it does not, the runner reads ``~/.halo/mcp-servers.json`` itself and wraps
 each config in a bare request. Either way the one shared ``attach_mcp_requests``
 routine does the connecting.
 """
@@ -14,13 +14,13 @@ from typing import Any
 import pytest
 from agents import ModelSettings
 
-import strix.tools.mcp as mcp_pkg
-import strix.tools.notes.tools as notes_tools
-import strix.tools.todo.tools as todo_tools
-from strix.core import runner
-from strix.core.agents import AgentCoordinator
-from strix.runtime import session_manager
-from strix.tools.mcp import McpConnectionConfig, McpConnectionRequest
+import halo.tools.mcp as mcp_pkg
+import halo.tools.notes.tools as notes_tools
+import halo.tools.todo.tools as todo_tools
+from halo.core import runner
+from halo.core.agents import AgentCoordinator
+from halo.runtime import session_manager
+from halo.tools.mcp import McpConnectionConfig, McpConnectionRequest
 
 
 def _settings() -> Any:
@@ -59,7 +59,7 @@ def _wire_runner(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
     monkeypatch.setattr(runner, "build_root_task", lambda _c: "task")
     monkeypatch.setattr(runner, "build_scope_context", lambda _c: {})
     monkeypatch.setattr(runner, "make_model_settings", lambda *_a, **_k: ModelSettings())
-    monkeypatch.setattr(runner, "build_strix_agent", lambda **_k: object())
+    monkeypatch.setattr(runner, "build_halo_agent", lambda **_k: object())
     monkeypatch.setattr(runner, "make_child_factory", lambda **_k: lambda **_kk: object())
     monkeypatch.setattr(runner, "open_agent_session", lambda _root_id, _db: object())
 
@@ -89,7 +89,7 @@ async def test_none_default_attaches_from_the_user_config_file(
 
     monkeypatch.setattr(mcp_pkg.McpRegistry, "register", _capture)
 
-    await runner.run_strix_scan(
+    await runner.run_halo_scan(
         scan_config={"targets": [], "scan_mode": "deep"},
         scan_id="scan-none",
         image="img",
@@ -132,7 +132,7 @@ async def test_supplied_requests_are_attached_and_the_user_file_is_not_read(
         )
     ]
 
-    await runner.run_strix_scan(
+    await runner.run_halo_scan(
         scan_config={"targets": [], "scan_mode": "deep"},
         scan_id="scan-supplied",
         image="img",
@@ -164,7 +164,7 @@ async def test_roster_is_persisted_even_without_a_status_sink(
 
     monkeypatch.setattr(runner, "_persist_mcp_status", _capture_persist)
 
-    await runner.run_strix_scan(
+    await runner.run_halo_scan(
         scan_config={"targets": [], "scan_mode": "deep"},
         scan_id="scan-persist",
         image="img",

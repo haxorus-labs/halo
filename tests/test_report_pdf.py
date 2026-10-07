@@ -13,7 +13,7 @@ from pypdf.errors import WrongPasswordError
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.platypus import Paragraph
 
-from strix.interface.viewer.report_pdf import (
+from halo.interface.viewer.report_pdf import (
     _duration,
     _inline_md,
     _normalize_severity,
@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 
 
 def _make_run(base: Path, name: str = "sample") -> Path:
-    run_dir = base / "strix_runs" / name
+    run_dir = base / "halo_runs" / name
     run_dir.mkdir(parents=True)
     record = {
         "run_name": name,
@@ -108,7 +108,7 @@ def test_build_encrypted_report(tmp_path: Path) -> None:
     run_dir = _make_run(tmp_path, name="run-42")
     pdf_bytes, password, filename = build_encrypted_report(run_dir)
 
-    assert filename == "strix-report-run-42.pdf"
+    assert filename == "halo-report-run-42.pdf"
     assert len(password) >= 20
     reader = PdfReader(BytesIO(pdf_bytes))
     assert reader.is_encrypted

@@ -15,9 +15,9 @@ from typing import TYPE_CHECKING, Any, cast
 import pytest
 from agents.tool_context import ToolContext
 
-from strix.core.agents import AgentCoordinator
-from strix.report.state import ReportState, set_global_report_state
-from strix.tools.agents_graph.tools import agent_finish, send_message_to_agent, wait_for_agents
+from halo.core.agents import AgentCoordinator
+from halo.report.state import ReportState, set_global_report_state
+from halo.tools.agents_graph.tools import agent_finish, send_message_to_agent, wait_for_agents
 
 
 if TYPE_CHECKING:
@@ -36,7 +36,7 @@ def report_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Re
 
 async def _graph(*, interactive: bool) -> AgentCoordinator:
     coordinator = AgentCoordinator()
-    await coordinator.register("root", "strix", parent_id=None)
+    await coordinator.register("root", "halo", parent_id=None)
     await coordinator.register("child", "Validator", parent_id="root")
     await coordinator.attach_runtime("root", resumable=interactive)
     await coordinator.attach_runtime("child", resumable=interactive)

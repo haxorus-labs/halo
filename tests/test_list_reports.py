@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from strix.report.state import ReportState, set_global_report_state
-from strix.tools.reporting.tool import (
+from halo.report.state import ReportState, set_global_report_state
+from halo.tools.reporting.tool import (
     _do_get_report,
     _do_list_reports,
     get_report,
@@ -423,7 +423,7 @@ def test_list_reports_severity_counts_ordered_with_none_bucket(
 
 @pytest.mark.usefixtures("report_state")
 def test_list_reports_no_state_returns_warning(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("strix.report.state.get_global_report_state", lambda: None)
+    monkeypatch.setattr("halo.report.state.get_global_report_state", lambda: None)
     result = _do_list_reports(
         severity=None, finding_class=None, target=None, search=None, include_details=False
     )
@@ -434,7 +434,7 @@ def test_list_reports_no_state_returns_warning(monkeypatch: pytest.MonkeyPatch) 
 
 @pytest.mark.usefixtures("report_state")
 def test_get_report_no_state_returns_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("strix.report.state.get_global_report_state", lambda: None)
+    monkeypatch.setattr("halo.report.state.get_global_report_state", lambda: None)
     result = _do_get_report("vuln-0001")
     assert result["success"] is False
     assert result["report"] is None

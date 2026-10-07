@@ -9,9 +9,9 @@ from typing import Any
 import pytest
 import requests
 
-from strix.interface import cloud
-from strix.interface.cloud import http, runner
-from strix.interface.completions import completion_candidates
+from halo.interface import cloud
+from halo.interface.cloud import http, runner
+from halo.interface.completions import completion_candidates
 
 
 class FakeResponse:
@@ -31,7 +31,7 @@ class FakeResponse:
 
 @pytest.fixture(autouse=True)
 def _token(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("STRIX_API_TOKEN", "idempotency-test-token")
+    monkeypatch.setenv("HALO_API_TOKEN", "idempotency-test-token")
     monkeypatch.setattr(time, "sleep", lambda _seconds: None)
 
 

@@ -7,7 +7,7 @@ from typing import Any, cast
 
 import pytest
 
-from strix.core.sessions import open_agent_session
+from halo.core.sessions import open_agent_session
 
 
 def _fd_dir() -> Path | None:

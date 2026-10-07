@@ -1,6 +1,6 @@
 ---
 title: "Custom Instructions"
-description: "Guide Strix with custom testing instructions"
+description: "Guide Halo with custom testing instructions"
 ---
 
 Use instructions to provide context, credentials, or focus areas for your scan.
@@ -8,7 +8,7 @@ Use instructions to provide context, credentials, or focus areas for your scan.
 ## Inline Instructions
 
 ```bash
-strix --target https://app.com --instruction "Focus on authentication vulnerabilities"
+halo --target https://app.com --instruction "Focus on authentication vulnerabilities"
 ```
 
 ## File-Based Instructions
@@ -16,7 +16,7 @@ strix --target https://app.com --instruction "Focus on authentication vulnerabil
 For complex instructions, use a file:
 
 ```bash
-strix --target https://app.com --instruction-file ./pentest-instructions.md
+halo --target https://app.com --instruction-file ./pentest-instructions.md
 ```
 
 ## Common Use Cases
@@ -24,28 +24,28 @@ strix --target https://app.com --instruction-file ./pentest-instructions.md
 ### Authenticated Testing
 
 ```bash
-strix --target https://app.com \
+halo --target https://app.com \
   --instruction "Login with email: test@example.com, password: TestPass123"
 ```
 
 ### Focused Scope
 
 ```bash
-strix --target https://api.example.com \
+halo --target https://api.example.com \
   --instruction "Focus on IDOR vulnerabilities in the /api/users endpoints"
 ```
 
 ### Exclusions
 
 ```bash
-strix --target https://app.com \
+halo --target https://app.com \
   --instruction "Do not test /admin or /internal endpoints"
 ```
 
 ### API Testing
 
 ```bash
-strix --target https://api.example.com \
+halo --target https://api.example.com \
   --instruction "Use API key header: X-API-Key: abc123. Focus on rate limiting bypass."
 ```
 
@@ -69,38 +69,38 @@ strix --target https://api.example.com \
 ```
 
 <Tip>
-Be specific. Good instructions help Strix prioritize the most valuable attack paths.
+Be specific. Good instructions help Halo prioritize the most valuable attack paths.
 </Tip>
 
 ## Workspace files
 
-Instructions become part of the prompt. To give Strix a file to work with, such
-as a wordlist, an API specification, or notes, use `--workspace-file`. Strix
+Instructions become part of the prompt. To give Halo a file to work with, such
+as a wordlist, an API specification, or notes, use `--workspace-file`. Halo
 places the file into the sandbox workspace before the scan starts.
 
 ```bash
-strix --target https://app.com --workspace-file ./wordlist.txt
+halo --target https://app.com --workspace-file ./wordlist.txt
 ```
 
 The file lands at `/workspace/<file name>`. To choose the destination, write
 `PATH:DEST`. `DEST` is a path inside `/workspace`.
 
 ```bash
-strix --target https://app.com \
+halo --target https://app.com \
   --workspace-file ./openapi.yaml:specs/openapi.yaml \
   --workspace-file ./notes.md
 ```
 
-Repeat the option for every file you want to place. Strix lists the files in the
+Repeat the option for every file you want to place. Halo lists the files in the
 agent task, so the agent knows where to read them.
 
 Rules that apply to every workspace file:
 
-- Strix copies the file into the sandbox. The agent can edit the copy, but the
+- Halo copies the file into the sandbox. The agent can edit the copy, but the
   file on your machine does not change.
 - The destination must stay inside `/workspace`.
 - The destination must not fall inside a target directory, because target files
-  come from the target itself. Strix skips such a file and logs a warning.
+  come from the target itself. Halo skips such a file and logs a warning.
 - Two files cannot claim the same destination.
 
 <Note>

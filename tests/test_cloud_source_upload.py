@@ -11,8 +11,8 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from strix.interface import cloud
-from strix.interface.cloud import http, source_upload
+from halo.interface import cloud
+from halo.interface.cloud import http, source_upload
 
 
 if TYPE_CHECKING:
@@ -39,7 +39,7 @@ class MalformedJsonResponse(FakeResponse):
 
 @pytest.fixture(autouse=True)
 def _token_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("STRIX_API_TOKEN", "test-token")
+    monkeypatch.setenv("HALO_API_TOKEN", "test-token")
 
 
 def _git_source(tmp_path: Path) -> Path:
@@ -159,18 +159,18 @@ def test_hidden_opt_in_cannot_reenable_dependency_cache_or_build_dirs(tmp_path: 
     assert manifest.excluded["dependency_or_build_output"] == len(excluded_dirs)
 
 
-def test_strixignore_and_cli_excludes_are_applied(tmp_path: Path) -> None:
+def test_haloignore_and_cli_excludes_are_applied(tmp_path: Path) -> None:
     (tmp_path / "keep.py").write_text("keep\n", encoding="utf-8")
     (tmp_path / "generated.py").write_text("generated\n", encoding="utf-8")
     (tmp_path / "test_app.py").write_text("test\n", encoding="utf-8")
-    (tmp_path / ".strixignore").write_text("generated.py\n", encoding="utf-8")
+    (tmp_path / ".haloignore").write_text("generated.py\n", encoding="utf-8")
 
     manifest = source_upload.select_source(tmp_path, exclude=["test_*.py"])
     assert [item.archive_name for item in manifest.files] == ["keep.py"]
     assert manifest.excluded["user_pattern"] == 2
 
 
-def test_strixignore_trailing_slash_excludes_the_whole_directory(tmp_path: Path) -> None:
+def test_haloignore_trailing_slash_excludes_the_whole_directory(tmp_path: Path) -> None:
     (tmp_path / "keep.py").write_text("keep\n", encoding="utf-8")
     private = tmp_path / "private" / "nested"
     private.mkdir(parents=True)
@@ -178,7 +178,7 @@ def test_strixignore_trailing_slash_excludes_the_whole_directory(tmp_path: Path)
     cache = tmp_path / "packages" / "cache"
     cache.mkdir(parents=True)
     (cache / "artifact.txt").write_text("do not upload\n", encoding="utf-8")
-    (tmp_path / ".strixignore").write_text("private/\n", encoding="utf-8")
+    (tmp_path / ".haloignore").write_text("private/\n", encoding="utf-8")
 
     manifest = source_upload.select_source(tmp_path, exclude=["cache/"])
 
@@ -220,10 +220,10 @@ def test_source_enumeration_is_bounded_before_filtering(
         source_upload.select_source(tmp_path)
 
 
-def test_strixignore_size_and_pattern_counts_are_bounded(
+def test_haloignore_size_and_pattern_counts_are_bounded(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    ignore = tmp_path / ".strixignore"
+    ignore = tmp_path / ".haloignore"
     monkeypatch.setattr(source_upload, "MAX_IGNORE_BYTES", 4)
     ignore.write_text("12345", encoding="utf-8")
     with pytest.raises(http.CloudError, match="larger than the 4-byte limit"):
@@ -237,9 +237,9 @@ def test_strixignore_size_and_pattern_counts_are_bounded(
 
 
 @pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="named pipes are not supported")
-def test_strixignore_must_be_a_nonblocking_regular_file(tmp_path: Path) -> None:
+def test_haloignore_must_be_a_nonblocking_regular_file(tmp_path: Path) -> None:
     (tmp_path / "app.py").write_text("print('ok')\n", encoding="utf-8")
-    os.mkfifo(tmp_path / ".strixignore")
+    os.mkfifo(tmp_path / ".haloignore")
 
     with pytest.raises(http.CloudError, match="must be a regular file"):
         source_upload.select_source(tmp_path)
@@ -695,4 +695,4 @@ def test_oversize_archive_names_largest_files_and_exclude_guidance(
     assert raised.value.next_step is not None
     assert "--exclude" in raised.value.next_step
     assert "--dry-run --show-files" in raised.value.next_step
-    assert not list(tmp_path.glob("strix-source-*.zip"))
+    assert not list(tmp_path.glob("halo-source-*.zip"))

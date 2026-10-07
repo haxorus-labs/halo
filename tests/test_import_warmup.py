@@ -1,7 +1,7 @@
 """The import warm-up thread must never race the main thread into the engine.
 
 Two threads that enter the same package graph from different modules hold
-each other's import locks (warm-up: ``strix.core.runner`` -> ``agents``;
+each other's import locks (warm-up: ``halo.core.runner`` -> ``agents``;
 main: ``agents.models.interface``). CPython breaks such a cycle by failing one
 of the imports, so the main thread waits for the warm-up before its first
 engine import.
@@ -15,7 +15,7 @@ import textwrap
 import threading
 from typing import TYPE_CHECKING
 
-from strix.llm import warmup
+from halo.llm import warmup
 
 
 if TYPE_CHECKING:
@@ -32,16 +32,16 @@ def _run(code: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def test_strix_report_does_not_import_the_agents_graph() -> None:
+def test_halo_report_does_not_import_the_agents_graph() -> None:
     result = _run(
         """
         import sys
 
-        import strix.report
+        import halo.report
 
         agents_modules = [m for m in sys.modules if m == "agents" or m.startswith("agents.")]
         assert not agents_modules, agents_modules
-        assert "strix.report.dedupe" not in sys.modules
+        assert "halo.report.dedupe" not in sys.modules
         """
     )
     assert result.returncode == 0, result.stderr
@@ -50,11 +50,11 @@ def test_strix_report_does_not_import_the_agents_graph() -> None:
 def test_check_duplicate_resolves_lazily() -> None:
     result = _run(
         """
-        import strix.report
-        from strix.report import check_duplicate
-        from strix.report.dedupe import check_duplicate as direct
+        import halo.report
+        from halo.report import check_duplicate
+        from halo.report.dedupe import check_duplicate as direct
 
-        assert strix.report.check_duplicate is direct is check_duplicate
+        assert halo.report.check_duplicate is direct is check_duplicate
         """
     )
     assert result.returncode == 0, result.stderr
@@ -65,7 +65,7 @@ def test_wait_for_import_warmup_lets_main_thread_import_the_agents_graph() -> No
         """
         import sys
 
-        from strix.llm.warmup import start_import_warmup, wait_for_import_warmup
+        from halo.llm.warmup import start_import_warmup, wait_for_import_warmup
 
         # Same shape as the CLI: warm-up starts, then the main thread needs a
         # module from the middle of the agents graph.
@@ -76,7 +76,7 @@ def test_wait_for_import_warmup_lets_main_thread_import_the_agents_graph() -> No
 
         assert "agents" in sys.modules
         assert "agents.models" in sys.modules
-        assert "strix.core.runner" in sys.modules
+        assert "halo.core.runner" in sys.modules
         """
     )
     assert result.returncode == 0, result.stderr
@@ -101,7 +101,7 @@ def test_wait_for_import_warmup_blocks_until_the_thread_finishes(
 
 
 def test_failed_warm_import_does_not_raise() -> None:
-    warmup._warm(("strix_no_such_module_for_warmup_test",))
+    warmup._warm(("halo_no_such_module_for_warmup_test",))
 
 
 def test_wait_for_import_warmup_is_a_no_op_without_a_thread() -> None:

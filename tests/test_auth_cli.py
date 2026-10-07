@@ -1,4 +1,4 @@
-"""Tests for the `strix auth` CLI: subcommand routing and provider naming."""
+"""Tests for the `halo auth` CLI: subcommand routing and provider naming."""
 
 from __future__ import annotations
 
@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from strix.config import codex
-from strix.interface import auth_cli
+from halo.config import codex
+from halo.interface import auth_cli
 
 
 if TYPE_CHECKING:
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 @pytest.fixture(autouse=True)
 def _tmp_store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(codex, "AUTH_PATH", tmp_path / "home" / ".strix" / "subscription-auth.json")
+    monkeypatch.setattr(codex, "AUTH_PATH", tmp_path / "home" / ".halo" / "subscription-auth.json")
 
 
 def test_login_provider_is_chatgpt() -> None:

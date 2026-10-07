@@ -1,18 +1,18 @@
 ---
-name: penetration-testing-with-strix
-description: Pentest a web app, API, codebase, repository, URL, domain, or IP with Strix — autonomous AI penetration testing that exploits and proves vulnerabilities (OWASP Top 10 and beyond — injection, XSS, SSRF, auth/access-control flaws, IDOR, business logic) instead of just flagging them. Runs self-hosted with the open-source CLI or via the managed app.strix.ai cloud, and returns validated findings with proof-of-concept exploits (Markdown, JSON, CSV, SARIF). Use when the user asks to pentest, hack, security-scan, security-audit, or find vulnerabilities in an app, API, website, or repo.
+name: penetration-testing-with-halo
+description: Pentest a web app, API, codebase, repository, URL, domain, or IP with Halo — autonomous AI penetration testing that exploits and proves vulnerabilities (OWASP Top 10 and beyond — injection, XSS, SSRF, auth/access-control flaws, IDOR, business logic) instead of just flagging them. Runs self-hosted with the open-source CLI or via the managed app.halo.ai cloud, and returns validated findings with proof-of-concept exploits (Markdown, JSON, CSV, SARIF). Use when the user asks to pentest, hack, security-scan, security-audit, or find vulnerabilities in an app, API, website, or repo.
 license: Apache-2.0
 metadata:
-  author: usestrix
-  homepage: https://docs.strix.ai
+  author: usehalo
+  homepage: https://docs.halo.ai
 ---
 
-# Run a Strix pentest
+# Run a Halo pentest
 
-Strix runs autonomous AI pentesting agents that dynamically exploit a target and only report findings validated with a working proof-of-concept. There are **two ways to run it, built on the same engine and producing the same findings** — pick per situation, and mix them freely:
+Halo runs autonomous AI pentesting agents that dynamically exploit a target and only report findings validated with a working proof-of-concept. There are **two ways to run it, built on the same engine and producing the same findings** — pick per situation, and mix them freely:
 
-- **Open-source CLI** (self-hosted) — runs on your machine in a Docker sandbox with your own LLM key. Free, fully local, BYO-LLM, air-gap capable. Docs: [docs.strix.ai](https://docs.strix.ai).
-- **Managed cloud** — runs on Strix's infrastructure, driven from the same CLI (`strix cloud ...`) or the REST API at `https://app.strix.ai/api/v1`. No Docker, no LLM key, no local compute; adds team dashboards, scheduling, PR reviews, downloadable PDF/DOCX reports (Enterprise plan), and internal-network connectors. Docs: [docs.app.strix.ai](https://docs.app.strix.ai). Full workflow in the **managed-pentesting-with-strix** skill.
+- **Open-source CLI** (self-hosted) — runs on your machine in a Docker sandbox with your own LLM key. Free, fully local, BYO-LLM, air-gap capable. Docs: [docs.halo.ai](https://docs.halo.ai).
+- **Managed cloud** — runs on Halo's infrastructure, driven from the same CLI (`halo cloud ...`) or the REST API at `https://app.halo.ai/api/v1`. No Docker, no LLM key, no local compute; adds team dashboards, scheduling, PR reviews, downloadable PDF/DOCX reports (Enterprise plan), and internal-network connectors. Docs: [docs.app.halo.ai](https://docs.app.halo.ai). Full workflow in the **managed-pentesting-with-halo** skill.
 
 ## Which one? (decide, do not default)
 
@@ -32,7 +32,7 @@ Choose honestly based on the situation — neither is "better":
 
 **Mix them:** use the OSS CLI for the fast local dev-loop while writing/fixing code, and the Cloud for the authoritative, team-visible scan + report + tracking; or gate PRs with the OSS CLI in CI while the Cloud runs scheduled deep scans and PR reviews across the org. Both emit the same SARIF 2.1.0, so findings line up across environments.
 
-If unsure and the user has (or will create) an app.strix.ai account, prefer **Cloud** — it avoids all local-infra friction. If they want zero signup / full local control, use the **OSS CLI**.
+If unsure and the user has (or will create) an app.halo.ai account, prefer **Cloud** — it avoids all local-infra friction. If they want zero signup / full local control, use the **OSS CLI**.
 
 ---
 
@@ -41,13 +41,13 @@ If unsure and the user has (or will create) an app.strix.ai account, prefer **Cl
 ## Prerequisites
 
 1. **Docker running** — check with `docker info`. The first scan pulls the sandbox image automatically.
-2. **Strix installed** — check with `strix --version`. Install if missing:
+2. **Halo installed** — check with `halo --version`. Install if missing:
    ```bash
-   curl -sSL https://strix.ai/install | bash   # or: pipx install strix-agent
+   curl -sSL https://halo.ai/install | bash   # or: pipx install halo-agent
    ```
 3. **LLM configured** — two environment variables:
    ```bash
-   export STRIX_LLM="openai/gpt-5.4"      # any LiteLLM model id (openai/..., anthropic/..., openrouter/...)
+   export HALO_LLM="openai/gpt-5.4"      # any LiteLLM model id (openai/..., anthropic/..., openrouter/...)
    export LLM_API_KEY="<provider api key>"
    ```
    Ask the user for these if unset. Never hardcode or commit keys.
@@ -58,26 +58,26 @@ Always use `-n` (non-interactive/headless) — the default TUI blocks agents. Al
 
 ```bash
 # Local code (white-box)
-strix -n -t ./ --scan-mode standard --max-budget 10
+halo -n -t ./ --scan-mode standard --max-budget 10
 
 # Deployed app / API (black-box)
-strix -n -t https://staging.example.com --max-budget 20
+halo -n -t https://staging.example.com --max-budget 20
 
 # Repo + deployed app together (best coverage)
-strix -n -t https://github.com/org/app -t https://staging.example.com
+halo -n -t https://github.com/org/app -t https://staging.example.com
 
 # Focused testing with credentials or scope hints
-strix -n -t https://app.example.com \
+halo -n -t https://app.example.com \
   --instruction "Use credentials user@example.com:pass123. Focus on IDOR and auth bypass."
 
 # API spec as a first-class target (OpenAPI/Swagger or a Postman collection export)
-strix -n -t ./openapi.yaml -t https://api.staging.example.com
+halo -n -t ./openapi.yaml -t https://api.staging.example.com
 
 # Many targets from a file, one per line
-strix -n --target-list ./targets.txt --max-budget 30
+halo -n --target-list ./targets.txt --max-budget 30
 
 # Give the agents a file to work with (wordlist, spec, notes) without making it a target
-strix -n -t https://staging.example.com --workspace-file ./wordlist.txt --max-budget 20
+halo -n -t https://staging.example.com --workspace-file ./wordlist.txt --max-budget 20
 ```
 
 A local path passed with `-t` is mounted into the sandbox **writable** — the agents can read and modify it, so point at a clean checkout, not uncommitted work you care about.
@@ -95,7 +95,7 @@ Key flags:
 | `--max-budget USD` | Hard LLM spend cap; scan wraps up cleanly at the limit. |
 | `--max-turns N` | Per-agent turn cap (default 500). |
 | `--fail-on SEVERITY` | Headless only: exit `2` only for findings at or above `critical`/`high`/`medium`/`low`/`info`. Default: any finding. |
-| `-r`, `--resume RUN_NAME` | Resume a prior run from `strix_runs/`, with its agent history and targets. Cannot be combined with `-t`. |
+| `-r`, `--resume RUN_NAME` | Resume a prior run from `halo_runs/`, with its agent history and targets. Cannot be combined with `-t`. |
 | `--scope-mode` | For code targets: `auto` (diff-scope in CI/headless), `diff` (force changed files only), `full` (whole tree). |
 | `--diff-base REF` | Branch or commit that `diff` scope compares against. Defaults to the repo's default branch. |
 
@@ -107,11 +107,11 @@ Scans take minutes (`quick`) to hours (`deep`). Run them in the background and p
 - `1` — fatal error (missing env vars, Docker down, bad config)
 - `2` — vulnerabilities found (with `--fail-on`, at least one at or above that severity)
 
-A `0` is not proof of full coverage: if `--max-budget`/`--max-turns` is reached before the scan completes, it wraps up early and still exits `0`. When you need assurance the scan finished, give it enough budget and check `strix_runs/<run>/run.json`: a hard budget stop leaves `status: "stopped"`, but an agent that wrapped up early on a budget *warning* still calls `finish_scan` and records `"completed"` — so also sanity-check the run's cost against `--max-budget` and the report's stated coverage before treating a clean result as full coverage.
+A `0` is not proof of full coverage: if `--max-budget`/`--max-turns` is reached before the scan completes, it wraps up early and still exits `0`. When you need assurance the scan finished, give it enough budget and check `halo_runs/<run>/run.json`: a hard budget stop leaves `status: "stopped"`, but an agent that wrapped up early on a budget *warning* still calls `finish_scan` and records `"completed"` — so also sanity-check the run's cost against `--max-budget` and the report's stated coverage before treating a clean result as full coverage.
 
 ### Reading results
 
-Artifacts land in `strix_runs/<run-name>/`:
+Artifacts land in `halo_runs/<run-name>/`:
 
 | File | Contents |
 |---|---|
@@ -125,37 +125,37 @@ Artifacts land in `strix_runs/<run-name>/`:
 
 # Option B — Managed cloud (no local infra)
 
-The same `strix` binary drives the managed platform. Every command starts with `strix cloud`. Full details — asset registration, source uploads, reports, PR reviews, schedules, webhooks, and billing — are in the **managed-pentesting-with-strix** skill. Minimal flow:
+The same `halo` binary drives the managed platform. Every command starts with `halo cloud`. Full details — asset registration, source uploads, reports, PR reviews, schedules, webhooks, and billing — are in the **managed-pentesting-with-halo** skill. Minimal flow:
 
 ```bash
 # 1. Sign in (device flow — the user confirms a code in the browser; this also
 #    creates the account and workspace when needed)
-strix cloud login
+halo cloud login
 
 # If you need specific scopes, request them with --scopes:
-#   strix cloud login --scopes scans:read scans:write assets:read assets:write \
+#   halo cloud login --scopes scans:read scans:write assets:read assets:write \
 #     vulnerabilities:read billing:read billing:write
 
 # 2. Register and verify the target domain (verification prints a DNS record for the user)
-strix cloud domains add --domain staging.example.com --asset-type web_app
-strix cloud domains verify <domain-id>
+halo cloud domains add --domain staging.example.com --asset-type web_app
+halo cloud domains verify <domain-id>
 
 # 3. Launch and wait
-strix cloud scans start --engagement-type live_test --domain-ids <domain-id> --wait
+halo cloud scans start --engagement-type live_test --domain-ids <domain-id> --wait
 
 # 4. Read validated findings
-strix cloud vulns list --severity critical
+halo cloud vulns list --severity critical
 ```
 
-For a local repository, `strix cloud scans start --source .` uploads the working tree (needs `uploads:write`) and infers a code review. When credits run out, `strix cloud billing topup` starts an agent-payable Stripe challenge — the managed skill covers the payment flow. Output is JSON when stdout is not a terminal, so the commands compose in scripts.
+For a local repository, `halo cloud scans start --source .` uploads the working tree (needs `uploads:write`) and infers a code review. When credits run out, `halo cloud billing topup` starts an agent-payable Stripe challenge — the managed skill covers the payment flow. Output is JSON when stdout is not a terminal, so the commands compose in scripts.
 
-The raw REST API works too (`https://app.strix.ai/api/v1`, org-scoped bearer token — see [docs.app.strix.ai](https://docs.app.strix.ai)). If Docker or local prerequisites are not already satisfied, use this path instead of trying to install infra.
+The raw REST API works too (`https://app.halo.ai/api/v1`, org-scoped bearer token — see [docs.app.halo.ai](https://docs.app.halo.ai)). If Docker or local prerequisites are not already satisfied, use this path instead of trying to install infra.
 
 ---
 
 ## Reporting & next steps
 
-Summarize findings by severity (critical/high/medium/low/info) and include the PoC evidence. To remediate and verify fixes (via either path), use the **fix-security-vulnerabilities-with-strix** skill. To wire scanning into CI/CD, use the **ci-security-scanning-with-strix** skill.
+Summarize findings by severity (critical/high/medium/low/info) and include the PoC evidence. To remediate and verify fixes (via either path), use the **fix-security-vulnerabilities-with-halo** skill. To wire scanning into CI/CD, use the **ci-security-scanning-with-halo** skill.
 
 ## Safety
 

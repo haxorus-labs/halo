@@ -10,9 +10,9 @@ from agents.models import _openai_shared
 from agents.models.openai_chatcompletions import OpenAIChatCompletionsModel
 from agents.models.openai_responses import OpenAIResponsesModel
 
-from strix.config import models
-from strix.config.models import (
-    StrixProvider,
+from halo.config import models
+from halo.config.models import (
+    HaloProvider,
     _NonStreamingModel,
     _TurnGuardModel,
     configure_sdk_model_defaults,
@@ -22,8 +22,8 @@ from strix.config.models import (
     supports_strict_tool_schemas,
     uses_chat_completions_tool_schema,
 )
-from strix.config.settings import Settings
-from strix.llm.request_log import RequestLoggingModel
+from halo.config.settings import Settings
+from halo.llm.request_log import RequestLoggingModel
 
 
 def test_request_timeout_extra_args_positive() -> None:
@@ -79,7 +79,7 @@ def test_other_routes_keep_strict_tool_schemas(model_name: str) -> None:
 def test_routes_through_litellm_matches_the_provider(
     monkeypatch: pytest.MonkeyPatch, model_name: str, litellm: bool
 ) -> None:
-    """The helper must agree with what StrixProvider actually builds.
+    """The helper must agree with what HaloProvider actually builds.
 
     Callers use it to decide whether a LiteLLM-only request field is safe to
     attach; on the SDK's own clients such a field raises TypeError mid-turn, so
@@ -88,7 +88,7 @@ def test_routes_through_litellm_matches_the_provider(
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     assert routes_through_litellm(model_name) is litellm
     try:
-        model = StrixProvider().get_model(model_name)
+        model = HaloProvider().get_model(model_name)
     except ImportError:
         # any-llm's client is an optional dependency; reaching it at all already
         # proves the route is not LiteLLM's.
@@ -100,13 +100,13 @@ def test_routes_through_litellm_matches_the_provider(
 
 
 def test_api_type_override_settings(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("STRIX_LLM", "gpt-4")
-    monkeypatch.setenv("STRIX_API_TYPE", "chat_completions")
+    monkeypatch.setenv("HALO_LLM", "gpt-4")
+    monkeypatch.setenv("HALO_API_TYPE", "chat_completions")
     assert uses_chat_completions_tool_schema("gpt-4", Settings()) is True
-    monkeypatch.setenv("STRIX_LLM", "openai/gpt-4")
-    monkeypatch.setenv("STRIX_API_TYPE", "responses")
+    monkeypatch.setenv("HALO_LLM", "openai/gpt-4")
+    monkeypatch.setenv("HALO_API_TYPE", "responses")
     assert uses_chat_completions_tool_schema("openai/gpt-4", Settings()) is False
-    monkeypatch.setenv("STRIX_LLM", "anthropic/claude-sonnet-4-5")
+    monkeypatch.setenv("HALO_LLM", "anthropic/claude-sonnet-4-5")
     assert uses_chat_completions_tool_schema("anthropic/claude-sonnet-4-5", Settings()) is True
 
 
@@ -129,22 +129,22 @@ def test_api_type_overrides_the_api_base_route(
     monkeypatch.setattr(litellm, "api_base", None)
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setenv("OPENAI_BASE_URL", "")
-    monkeypatch.setenv("STRIX_LLM", "gpt-5")
+    monkeypatch.setenv("HALO_LLM", "gpt-5")
     monkeypatch.setenv("LLM_API_KEY", "test-key")
     monkeypatch.setenv("LLM_API_BASE", "https://gateway.example/v1")
-    monkeypatch.delenv("STRIX_API_TYPE", raising=False)
+    monkeypatch.delenv("HALO_API_TYPE", raising=False)
     if api_type is not None:
-        monkeypatch.setenv("STRIX_API_TYPE", api_type)
+        monkeypatch.setenv("HALO_API_TYPE", api_type)
     configure_sdk_model_defaults(Settings())
-    model = StrixProvider().get_model("gpt-5")
+    model = HaloProvider().get_model("gpt-5")
     while isinstance(model, _NonStreamingModel | _TurnGuardModel | RequestLoggingModel):
         model = model._inner
     assert isinstance(model, expected)
 
 
 def _settings(monkeypatch: pytest.MonkeyPatch, model: str, api_base: str | None) -> Settings:
-    monkeypatch.setenv("STRIX_LLM", model)
-    monkeypatch.delenv("STRIX_API_TYPE", raising=False)
+    monkeypatch.setenv("HALO_LLM", model)
+    monkeypatch.delenv("HALO_API_TYPE", raising=False)
     for name in ("LLM_API_BASE", "OPENAI_API_BASE", "OPENAI_BASE_URL"):
         monkeypatch.delenv(name, raising=False)
     if api_base is not None:
@@ -170,9 +170,9 @@ def test_resolve_api_type_follows_the_catalog_not_the_base_url(
 
 def test_resolve_api_type_explicit_override_wins(monkeypatch: pytest.MonkeyPatch) -> None:
     _settings(monkeypatch, "gpt-daybreak-blue-latest", "https://gateway.example/v1")
-    monkeypatch.setenv("STRIX_API_TYPE", "chat_completions")
+    monkeypatch.setenv("HALO_API_TYPE", "chat_completions")
     assert resolve_api_type("gpt-daybreak-blue-latest", Settings()) == "chat_completions"
-    monkeypatch.setenv("STRIX_API_TYPE", "Responses")
+    monkeypatch.setenv("HALO_API_TYPE", "Responses")
     assert resolve_api_type("gpt-5", Settings()) == "responses"
 
 
@@ -183,8 +183,8 @@ def test_resolve_api_type_explicit_override_wins(monkeypatch: pytest.MonkeyPatch
 def test_reasoning_effort_is_case_insensitive(
     monkeypatch: pytest.MonkeyPatch, raw: str, expected: str
 ) -> None:
-    monkeypatch.setenv("STRIX_REASONING_EFFORT", raw)
-    monkeypatch.setenv("STRIX_DEDUPE_REASONING_EFFORT", raw)
+    monkeypatch.setenv("HALO_REASONING_EFFORT", raw)
+    monkeypatch.setenv("HALO_DEDUPE_REASONING_EFFORT", raw)
     settings = Settings()
     assert settings.llm.reasoning_effort == expected
     assert settings.dedupe.reasoning_effort == expected
@@ -193,7 +193,7 @@ def test_reasoning_effort_is_case_insensitive(
 def test_configure_sdk_api_route_follows_the_given_model(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A ``model=`` override picks its own route, not ``STRIX_LLM``'s."""
+    """A ``model=`` override picks its own route, not ``HALO_LLM``'s."""
     routes: list[str] = []
     monkeypatch.setattr(models, "set_default_openai_api", routes.append)
     settings = _settings(monkeypatch, "gpt-5", "https://gateway.example/v1")

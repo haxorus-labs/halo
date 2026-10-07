@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: strix/interface/viewer/frontend
+        working-directory: halo/interface/viewer/frontend
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
         with:
@@ -20,8 +20,8 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-          cache-dependency-path: strix/interface/viewer/frontend/package-lock.json
+          cache-dependency-path: halo/interface/viewer/frontend/package-lock.json
       - run: npm ci --no-audit --no-fund
       - run: npm run build
       - name: Committed viewer bundle matches the build
-        run: git -C "$GITHUB_WORKSPACE" diff --exit-code --stat -- strix/interface/viewer/static && test -z "$(git -C "$GITHUB_WORKSPACE" status --porcelain -- strix/interface/viewer/static)"
+        run: git -C "$GITHUB_WORKSPACE" diff --exit-code --stat -- halo/interface/viewer/static && test -z "$(git -C "$GITHUB_WORKSPACE" status --porcelain -- halo/interface/viewer/static)"

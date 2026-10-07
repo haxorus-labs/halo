@@ -6,8 +6,8 @@ import sys
 import pytest
 from rich.console import Console
 
-from strix.interface.main import _force_utf8_streams
-from strix.interface.tui.runtime import _open_output_sink
+from halo.interface.main import _force_utf8_streams
+from halo.interface.tui.runtime import _open_output_sink
 
 
 UNICODE_SAMPLE = "Reflected XSS in / \u2713 \u2192 \U0001f50d \u00b7 done"

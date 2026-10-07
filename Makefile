@@ -1,6 +1,6 @@
 .PHONY: help install dev-install format lint format-check lint-check type-check security check-all clean pre-commit setup-dev dev viewer wheel tui-build tui-test tui-lint
 
-TUI_BINARY := build/sidecar/strix-tui$(if $(filter Windows_NT,$(OS)),.exe)
+TUI_BINARY := build/sidecar/halo-tui$(if $(filter Windows_NT,$(OS)),.exe)
 
 help:
 	@echo "Available commands:"
@@ -55,14 +55,14 @@ lint-check:
 
 type-check:
 	@echo "🔍 Type checking with mypy..."
-	uv run mypy strix/
+	uv run mypy halo/
 	@echo "🔍 Type checking with pyright..."
-	uv run pyright strix/
+	uv run pyright halo/
 	@echo "✅ Type checking complete!"
 
 security:
 	@echo "🔒 Running security checks with bandit..."
-	uv run bandit -r strix/ -c pyproject.toml
+	uv run bandit -r halo/ -c pyproject.toml
 	@echo "✅ Security checks complete!"
 
 check-all: format-check lint-check type-check security
@@ -83,8 +83,8 @@ clean:
 
 viewer:
 	@echo "🖥️  Building the local-viewer SPA..."
-	cd strix/interface/viewer/frontend && npm ci && npm run build
-	@echo "✅ Viewer built to strix/interface/viewer/static/ (commit the changes)."
+	cd halo/interface/viewer/frontend && npm ci && npm run build
+	@echo "✅ Viewer built to halo/interface/viewer/static/ (commit the changes)."
 
 wheel:
 	uv build --wheel
@@ -94,10 +94,10 @@ dev: format lint type-check
 
 tui-build:
 	mkdir -p build/sidecar
-	cd strix/interface/tui && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o ../../../$(TUI_BINARY) ./cmd/strix-tui
+	cd halo/interface/tui && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o ../../../$(TUI_BINARY) ./cmd/halo-tui
 
 tui-test:
-	cd strix/interface/tui && go test -race ./...
+	cd halo/interface/tui && go test -race ./...
 
 tui-lint:
-	cd strix/interface/tui && test -z "$$(gofmt -l .)" && go vet ./...
+	cd halo/interface/tui && test -z "$$(gofmt -l .)" && go vet ./...

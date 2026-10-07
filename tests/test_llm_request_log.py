@@ -27,14 +27,14 @@ from openai import APIStatusError, APITimeoutError, PermissionDeniedError
 from openai.types.responses import Response, ResponseCompletedEvent, ResponseCreatedEvent
 from openai.types.responses.response import IncompleteDetails
 
-from strix.config import codex, models
-from strix.llm import request_log
+from halo.config import codex, models
+from halo.llm import request_log
 
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, AsyncIterator, Iterator
 
-    from strix.llm.request_log import LlmRequestEvent
+    from halo.llm.request_log import LlmRequestEvent
 
 
 ANTHROPIC_BLOCK_BODY = (
@@ -348,7 +348,7 @@ async def test_litellm_logger_dispatches_and_isolates_sink_failures(
     request_log.register_sink(boom)
     try:
         logger = request_log._build_litellm_logger()
-        with caplog.at_level(logging.ERROR, logger="strix.llm.request_log"):
+        with caplog.at_level(logging.ERROR, logger="halo.llm.request_log"):
             await logger.async_log_success_event(
                 _anthropic_kwargs(None, headers={"request-id": "req_dispatch"}),
                 _FakeResponse(),
@@ -375,7 +375,7 @@ def test_dispatch_swallows_malformed_callback_payloads(captured: list[LlmRequest
 def test_install_is_idempotent_and_registers_one_litellm_callback() -> None:
     request_log.install()
     request_log.install()
-    ours = [cb for cb in litellm.callbacks if type(cb).__name__ == "_StrixRequestLogger"]
+    ours = [cb for cb in litellm.callbacks if type(cb).__name__ == "_HaloRequestLogger"]
     assert len(ours) == 1
 
 
@@ -388,7 +388,7 @@ def test_log_line_sink_formats_without_content(caplog: pytest.LogCaptureFixture)
         None,
         outcome="error",
     )
-    with caplog.at_level(logging.DEBUG, logger="strix.llm.request_log"):
+    with caplog.at_level(logging.DEBUG, logger="halo.llm.request_log"):
         request_log._log_line_sink(event)
     line = caplog.records[-1].getMessage()
     assert "request_id=req_line01" in line
@@ -454,7 +454,7 @@ def test_details_keep_everything_as_written_and_bound_it() -> None:
             "temperature": 0,
             "thinking": {"type": "enabled", "budget_tokens": 1024},
             "tools": [{"name": "t", "input_schema": {}}],
-            "extra_headers": {"x-title": "strix"},
+            "extra_headers": {"x-title": "halo"},
             "api_base": "https://gw.example/v1?tenant=abc",
             "usage": {
                 "input_tokens": 10,
@@ -473,7 +473,7 @@ def test_details_keep_everything_as_written_and_bound_it() -> None:
         "temperature": 0,
         "thinking": {"type": "enabled", "budget_tokens": 1024},
         "tools": [{"name": "t"}],
-        "extra_headers": {"x-title": "strix"},
+        "extra_headers": {"x-title": "halo"},
         "api_base": "https://gw.example/v1?tenant=abc",
         "usage": {
             "input_tokens": 10,
