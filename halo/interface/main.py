@@ -64,6 +64,7 @@ Additional commands:
   halo cloud ...          Use the managed Halo platform
   halo auth ...           Manage model-subscription sign-in
   halo view [RUN]         View a completed or running scan
+  halo knowledge ...      Inspect the per-machine SAST knowledge store
   halo completions SHELL  Generate zsh, bash, or fish tab completion
 """
 
@@ -447,6 +448,12 @@ def main() -> None:
 
         run_view(sys.argv[2:])
         return
+
+    # `halo knowledge ...` manages the per-machine SAST knowledge store.
+    if len(sys.argv) > 1 and sys.argv[1] == "knowledge":
+        from halo.interface.knowledge_cli import run_knowledge
+
+        sys.exit(run_knowledge(sys.argv[2:]))
 
     # `halo auth …` manages model-subscription sign-in and exits; it needs no
     # target, Docker, or scan setup.

@@ -18,6 +18,7 @@ from halo.sast.enrich import enrich_graph_json
 from halo.sast.findings import STATE_REFUTED, STATE_UNVERIFIED, VALID_STATES, FindingStore
 from halo.sast.gates import adversarial_verify, sanitizer_gate
 from halo.sast.graph import graph_path_for
+from halo.sast.knowledge import load_snapshot_states, save_snapshot, target_key
 from halo.sast.paths import resolve_source_root
 from halo.sast.runners import scan_source
 from halo.sast.taxonomy import recipe_for_finding
@@ -27,11 +28,17 @@ logger = logging.getLogger(__name__)
 
 _store: FindingStore | None = None
 _default_source_roots: list[str] = []
+_target_repo_url: str = ""
 
 
 def set_default_source_roots(roots: list[str]) -> None:
     global _default_source_roots  # noqa: PLW0603
     _default_source_roots = list(roots)
+
+
+def set_target_repo_url(repo_url: str) -> None:
+    global _target_repo_url  # noqa: PLW0603
+    _target_repo_url = repo_url
 
 
 def hydrate_sast_from_disk(state_dir: Path) -> None:
@@ -60,17 +67,29 @@ async def _sast_scan_impl(source_path: str) -> dict[str, Any]:
     known = store.current()
     new_findings = [f for f in candidates if f.id not in known]
 
+    key = target_key(_default_source_roots, _target_repo_url)
+    snapshot = load_snapshot_states(key)
+    carried = 0
+    for finding in new_findings:
+        prev = snapshot.get(finding.id)
+        if prev is not None:
+            finding.state = prev.state
+            finding.reason = f"carried from previous run: {prev.reason}"
+            carried += 1
+
     for finding in new_findings:
         store.record(finding)
 
     graph_json = graph_path_for(_run_dir())
     if graph_json.is_file() and new_findings:
         await asyncio.to_thread(enrich_graph_json, graph_json, new_findings)
+    save_snapshot(key, graph_json if graph_json.is_file() else None, store.path)
 
     return {
         "new_findings": [f.to_dict() for f in new_findings],
         "new_count": len(new_findings),
         "known_count": len(known),
+        "carried_count": carried,
         "states": {s: sum(1 for f in known.values() if f.state == s) for s in VALID_STATES},
     }
 
@@ -92,31 +111,47 @@ async def sast_scan(ctx: RunContextWrapper, source_path: str = "") -> str:
     return json.dumps(await _sast_scan_impl(source_path), ensure_ascii=False, default=str)
 
 
-async def _finding_verify_impl(finding_id: str, source_slice: str) -> dict[str, Any]:
+async def _finding_verify_impl(
+    finding_id: str, source_slice: str, control_status: int | None = None
+) -> dict[str, Any]:
     store = _require_store()
     finding = store.get(finding_id)
     if finding is None:
         return {"error": f"unknown finding_id: {finding_id}"}
 
     recipe = recipe_for_finding(finding)
+    key = target_key(_default_source_roots, _target_repo_url)
     gate = sanitizer_gate(source_slice, recipe.guards if recipe is not None else ())
     if gate == "defended":
         store.set_state(finding_id, STATE_REFUTED, reason="adequate guard/sanitizer present")
+        save_snapshot(key, None, store.path)
         return {
             "finding_id": finding_id,
             "state": STATE_REFUTED,
             "reason": "sanitizer gate: defended",
         }
 
+    if control_status is not None and 200 <= control_status < 300:
+        reason = (
+            "negative control fired: authorized persona reproduced the signal "
+            f"(HTTP {control_status}); not a vulnerability"
+        )
+        store.set_state(finding_id, STATE_REFUTED, reason=reason)
+        save_snapshot(key, None, store.path)
+        return {"finding_id": finding_id, "state": STATE_REFUTED, "reason": reason}
+
     verdict = await adversarial_verify(finding, source_slice, load_settings(), recipe)
     mapping = {"CONFIRMED": "VERIFIED", "REFUTED": STATE_REFUTED, "UNVERIFIED": STATE_UNVERIFIED}
     state = mapping.get(verdict["verdict"], STATE_UNVERIFIED)
     store.set_state(finding_id, state, reason=verdict["reason"])
+    save_snapshot(key, None, store.path)
     return {"finding_id": finding_id, "state": state, "reason": verdict["reason"]}
 
 
 @function_tool(timeout=120)
-async def finding_verify(ctx: RunContextWrapper, finding_id: str, source_slice: str) -> str:
+async def finding_verify(
+    ctx: RunContextWrapper, finding_id: str, source_slice: str, control_status: int | None = None
+) -> str:
     """Adversarially verify a finding with an LLM pass over its code slice.
 
     Runs the sanitizer gate first; if the sink looks adequately guarded the
@@ -126,9 +161,16 @@ async def finding_verify(ctx: RunContextWrapper, finding_id: str, source_slice: 
     Args:
         finding_id: Fingerprint id returned by sast_scan.
         source_slice: The relevant code around the sink (a few dozen lines).
+        control_status: Observed HTTP status when replaying the PoC as an
+            authorized persona (negative control). A 2xx here means the
+            signal reproduces without privilege abuse, so the finding is
+            REFUTED as a vulnerability; anything else continues to the
+            LLM verdict.
     """
     return json.dumps(
-        await _finding_verify_impl(finding_id, source_slice), ensure_ascii=False, default=str
+        await _finding_verify_impl(finding_id, source_slice, control_status),
+        ensure_ascii=False,
+        default=str,
     )
 
 

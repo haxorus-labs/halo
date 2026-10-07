@@ -18,6 +18,9 @@ hand-rolling this playbook:
    deduped into `findings.jsonl`, enriched into the graph.
 3. `finding_verify(finding_id=..., source_slice=...)` — sanitizer gate, then
    one LLM adversarial call adjudicates VERIFIED / REFUTED / UNVERIFIED.
+   Pass `control_status` with the status observed replaying the PoC as an
+   authorized persona: a 2xx negative control REFUTEs the finding as a
+   vulnerability without spending the LLM call.
 4. `finding_state(...)` — record manual verdicts.
 5. `kg_query` / `kg_path` / `kg_explain` — pull targeted slices instead of
    reading whole files; this is how you preserve token budget.
@@ -27,6 +30,12 @@ hand-rolling this playbook:
    2xx writes an allows edge, 401/403 a denies edge. Query with
    `kg_authmap(route)` ("who can reach this?") and `kg_unguarded()` (routes
    anon can reach). Never guess access from source; only recorded probes count.
+7. Deterministic verification: `replay_poc(request_id=...|"raw_request=...,
+   expect_status=..., expect_body_contains=[...], runs=3)` replays a PoC N
+   times and asserts the oracle on every run — verdict REPRODUCED only when
+   all runs satisfy it. Use `reset_sandbox(commands=[...])` first when the
+   PoC mutates target state (defaults to the fixture's reset commands when
+   defined; reports honestly when none exist).
 
 Only fall back to the manual commands below when you need raw artifacts.
 

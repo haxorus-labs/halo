@@ -114,6 +114,18 @@ persona observes per route with `kg_auth_record(route, persona, status)`
 who can reach it or `kg_unguarded()` for the anon-reachable surface. Only
 measured probes count — never guess access from source.
 
+Deterministic verification: `replay_poc` replays a PoC request N times
+(default 3) and asserts oracle predicates (status, body markers) on every
+run, returning a reproducible evidence bundle; `reset_sandbox` re-runs
+target reset commands first when the PoC mutates state. `finding_verify`
+accepts a `control_status` from replaying the PoC as an authorized persona:
+a 2xx negative control refutes the finding without an LLM call.
+
+Cross-run memory: terminal finding states (REFUTED/VERIFIED) persist per
+target in `~/.halo/knowledge/`; unchanged findings keep their verdicts,
+changed code re-enters as PROPOSED. Manage with
+`halo knowledge path|prune`.
+
 ## Development
 
 ```bash

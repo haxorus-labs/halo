@@ -301,6 +301,7 @@ async def run_halo_scan(
         hydrate_sast_from_disk,
         sast_scan,
     )
+    from halo.tools.verify.tools import replay_poc, reset_sandbox
 
     hydrate_sast_from_disk(state_dir)
     hydrate_kg_from_disk(state_dir)
@@ -401,18 +402,26 @@ async def run_halo_scan(
                 kg_auth_record,
                 kg_authmap,
                 kg_unguarded,
+                replay_poc,
+                reset_sandbox,
             )
             from halo.tools.kg.tools import set_default_source_roots as _set_kg_roots
             from halo.tools.sast.tools import set_default_source_roots as _set_sast_roots
+            from halo.tools.sast.tools import set_target_repo_url as _set_sast_repo_url
+            from halo.tools.verify.tools import set_default_source_roots as _set_verify_roots
 
             roots: list[str] = []
+            repo_url = ""
             for t in targets:
                 if t.get("type") == "local_code" and t.get("details", {}).get("target_path"):
                     roots.append(str(t["details"]["target_path"]))
                 elif t.get("type") == "repository" and t.get("details", {}).get("cloned_repo_path"):
                     roots.append(str(t["details"]["cloned_repo_path"]))
+                    repo_url = repo_url or str(t["details"].get("target_repo") or "")
             _set_kg_roots(roots)
             _set_sast_roots(roots)
+            _set_sast_repo_url(repo_url)
+            _set_verify_roots(roots)
         diff_scope = scan_config.get("diff_scope")
         is_diff_scoped = bool(isinstance(diff_scope, dict) and diff_scope.get("active"))
         skills = list(scan_config.get("skills") or [])

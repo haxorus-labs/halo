@@ -18,7 +18,7 @@ import yaml
 PACK_DIR = Path(__file__).parent / "fixtures"
 
 _REQUIRED_KEYS = frozenset({"id", "version", "title", "match", "login", "personas"})
-_OPTIONAL_KEYS = frozenset({"auth_signals", "evidence"})
+_OPTIONAL_KEYS = frozenset({"auth_signals", "evidence", "reset"})
 
 
 @dataclass(frozen=True)
@@ -45,6 +45,8 @@ class Fixture:
     denied_statuses: tuple[int, ...]
     notes: str = ""
     evidence: tuple[str, ...] = ()
+    reset_commands: tuple[str, ...] = ()
+    reset_notes: str = ""
 
 
 def _load_file(path: Path) -> Fixture:
@@ -86,6 +88,9 @@ def _load_file(path: Path) -> Fixture:
     body = login.get("body") or {}
     if not isinstance(body, dict):
         raise TypeError(f"fixture {path.name}: login.body must be a mapping")
+    reset = data.get("reset") or {}
+    if not isinstance(reset, dict):
+        raise TypeError(f"fixture {path.name}: reset must be a mapping")
     return Fixture(
         id=str(data["id"]),
         version=int(data["version"]),
@@ -101,6 +106,8 @@ def _load_file(path: Path) -> Fixture:
         denied_statuses=tuple(int(s) for s in signals.get("denied_statuses") or (401, 403)),
         notes=str(signals.get("notes") or ""),
         evidence=tuple(str(e) for e in data.get("evidence") or []),
+        reset_commands=tuple(str(c) for c in reset.get("commands") or []),
+        reset_notes=str(reset.get("notes") or ""),
     )
 
 

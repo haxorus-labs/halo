@@ -33,4 +33,12 @@ auth_signals:
     is POST /rest/user/login with {email, password}; the response carries
     authentication.token. Emails are <name>@<application.domain>
     (default domain juice-sh.op).
+reset:
+  commands: []
+  notes: >
+    No safe automatic reset: challenge progress and the sqlite database
+    persist across restarts. Restarting the node process reseeds
+    in-memory state only. For replay runs, prefer read-oracle PoCs or
+    pass explicit reset commands to reset_sandbox after confirming what
+    the target setup created.
 evidence: []
