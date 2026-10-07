@@ -1,0 +1,16 @@
+id: js-unsafe-formatstring
+version: 1
+title: Unsafe format string with untrusted input
+match:
+  tool: semgrep
+  check_ids:
+    - "*unsafe-formatstring*"
+severity: MEDIUM
+cwe: CWE-134
+guards: []
+notes: >
+  Format strings incorporating untrusted input can leak or corrupt output.
+  Uphold only if the format template itself (not just the arguments) is
+  attacker-influenced.
+mutants: []
+evidence: []

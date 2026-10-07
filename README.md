@@ -103,6 +103,10 @@ tree or a GitHub repo), gated by `HALO_SAST_ENABLED` (default on):
 5. `kg_query` / `kg_path` / `kg_explain` — pull targeted code slices from
    the graph instead of reading whole files.
 
+Findings carry a curated taxonomy id (`halo/sast/taxonomy/*.yaml`: guard
+patterns, severity, mutant payloads per rule family). Recipe ids are stable —
+never rename one, since they are hashed into finding fingerprints.
+
 ## Development
 
 ```bash

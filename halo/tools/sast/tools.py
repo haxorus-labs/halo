@@ -20,6 +20,7 @@ from halo.sast.gates import adversarial_verify, sanitizer_gate
 from halo.sast.graph import graph_path_for
 from halo.sast.paths import resolve_source_root
 from halo.sast.runners import scan_source
+from halo.sast.taxonomy import recipe_for_finding
 
 
 logger = logging.getLogger(__name__)
@@ -97,7 +98,8 @@ async def _finding_verify_impl(finding_id: str, source_slice: str) -> dict[str, 
     if finding is None:
         return {"error": f"unknown finding_id: {finding_id}"}
 
-    gate = sanitizer_gate(source_slice)
+    recipe = recipe_for_finding(finding)
+    gate = sanitizer_gate(source_slice, recipe.guards if recipe is not None else ())
     if gate == "defended":
         store.set_state(finding_id, STATE_REFUTED, reason="adequate guard/sanitizer present")
         return {
@@ -106,7 +108,7 @@ async def _finding_verify_impl(finding_id: str, source_slice: str) -> dict[str, 
             "reason": "sanitizer gate: defended",
         }
 
-    verdict = await adversarial_verify(finding, source_slice, load_settings())
+    verdict = await adversarial_verify(finding, source_slice, load_settings(), recipe)
     mapping = {"CONFIRMED": "VERIFIED", "REFUTED": STATE_REFUTED, "UNVERIFIED": STATE_UNVERIFIED}
     state = mapping.get(verdict["verdict"], STATE_UNVERIFIED)
     store.set_state(finding_id, state, reason=verdict["reason"])

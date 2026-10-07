@@ -1,0 +1,23 @@
+id: sqli-sequelize
+version: 1
+title: Sequelize SQL injection via Express request input
+match:
+  tool: semgrep
+  check_ids:
+    - "*sequelize*injection*"
+severity: HIGH
+cwe: CWE-89
+guards:
+  - "replacements\\s*:"
+  - ":\\s*bind\\b"
+  - "\\bbind\\s*[:=]"
+  - "QueryTypes\\.SELECT"
+  - "sequelize\\.escape\\("
+notes: >
+  Raw string concatenation or template interpolation of request data into
+  sequelize.query() is exploitable. Bound replacements / bind parameters or
+  QueryTypes.SELECT with escaped input refute the finding.
+mutants:
+  - "' OR '1'='1"
+  - "1;DROP TABLE users--"
+evidence: []

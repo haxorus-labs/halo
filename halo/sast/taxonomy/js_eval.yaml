@@ -1,0 +1,17 @@
+id: js-eval
+version: 1
+title: Direct eval() of dynamic code
+match:
+  tool: semgrep
+  check_ids:
+    - "*eval-detected*"
+severity: HIGH
+cwe: CWE-95
+guards:
+  - "JSON\\.parse\\("
+notes: >
+  eval() on request-influenced input is code injection. JSON.parse or another
+  structured parser in the slice refutes the finding.
+mutants:
+  - "require('child_process').exec('id')"
+evidence: []

@@ -12,6 +12,7 @@ from typing import Any, cast
 
 from halo.sast.findings import Finding
 from halo.sast.fingerprint import compute_fingerprint
+from halo.sast.taxonomy import match_recipe
 
 
 logger = logging.getLogger(__name__)
@@ -40,8 +41,10 @@ def parse_semgrep(payload: str) -> list[Finding]:
         message = str(extra.get("message") or "")
         severity = str(extra.get("severity") or "WARNING").upper()
         sink = path  # semgrep JSON has no resolved symbol; path is the anchor
+        recipe = match_recipe("semgrep", check_id)
+        taxonomy = recipe.id if recipe else "semgrep"
         fingerprint = compute_fingerprint(
-            path, check_id, _slice_hash(message, path, line), "semgrep"
+            path, check_id, _slice_hash(message, path, line), taxonomy
         )
         findings.append(
             Finding(
@@ -52,7 +55,7 @@ def parse_semgrep(payload: str) -> list[Finding]:
                 line=line,
                 sink_symbol=sink,
                 message=message,
-                taxonomy="semgrep",
+                taxonomy=taxonomy,
                 severity=severity,
                 ast_slice_hash=_slice_hash(message, path, line),
             )
@@ -74,9 +77,9 @@ def parse_gitleaks(payload: str) -> list[Finding]:
         line = int(item.get("StartLine") or 0)
         rule_id = str(item.get("RuleID") or "unknown")
         message = str(item.get("Description") or "")
-        fingerprint = compute_fingerprint(
-            path, rule_id, _slice_hash(message, path, line), "gitleaks"
-        )
+        recipe = match_recipe("gitleaks", rule_id)
+        taxonomy = recipe.id if recipe else "secret"
+        fingerprint = compute_fingerprint(path, rule_id, _slice_hash(message, path, line), taxonomy)
         findings.append(
             Finding(
                 id=fingerprint,
@@ -86,7 +89,7 @@ def parse_gitleaks(payload: str) -> list[Finding]:
                 line=line,
                 sink_symbol=path,
                 message=message,
-                taxonomy="secret",
+                taxonomy=taxonomy,
                 severity="HIGH",
                 ast_slice_hash=_slice_hash(message, path, line),
             )

@@ -1,0 +1,20 @@
+id: js-hardcoded-hmac
+version: 1
+title: Hardcoded HMAC / signing key
+match:
+  tool: semgrep
+  check_ids:
+    - "*hardcoded-hmac-key*"
+    - "*hardcoded-jwt-secret*"
+severity: MEDIUM
+cwe: CWE-798
+guards:
+  - "process\\.env\\b"
+  - "os\\.environ\\b"
+  - "getenv\\("
+  - "config\\.(get|SECRET)"
+notes: >
+  Keys read from environment or secret config refute the finding. Literal
+  strings in source uphold it.
+mutants: []
+evidence: []

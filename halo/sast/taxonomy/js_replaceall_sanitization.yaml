@@ -1,0 +1,19 @@
+id: js-replaceall-sanitization
+version: 1
+title: String replaceAll used as sanitizer (bypassable)
+match:
+  tool: semgrep
+  check_ids:
+    - "*detect-replaceall-sanitization*"
+severity: MEDIUM
+cwe: CWE-20
+guards:
+  - "DOMPurify"
+  - "validator\\."
+  - "escapeHtml|escape-html|he\\.encode"
+notes: >
+  Chained .replace()/.replaceAll() calls are order-dependent and bypassable.
+  A dedicated sanitizer/encoder library refutes the finding.
+mutants:
+  - "<<script>script>alert(1)<</script>/script>"
+evidence: []

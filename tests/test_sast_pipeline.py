@@ -10,6 +10,7 @@ from halo.sast.gates import sanitizer_gate
 from halo.sast.graph import build_graph, graph_path_for, query_graph_text
 from halo.sast.paths import resolve_source_root
 from halo.sast.runners import parse_gitleaks, parse_semgrep, parse_trivy
+from halo.sast.taxonomy import load_recipes, match_recipe, recipe_for_finding
 
 
 def test_fingerprint_is_deterministic():
@@ -189,3 +190,76 @@ def test_resolve_source_root_unknown_without_roots():
     assert resolve_source_root("/workspace/juice-shop", []) is None
     assert resolve_source_root("", []) is None
     assert resolve_source_root("/does/not/exist", []) is None
+
+
+def test_taxonomy_pack_loads_with_unique_ids_and_valid_regexes():
+    recipes = load_recipes()
+    assert len(recipes) >= 20
+    assert len({r.id for r in recipes}) == len(recipes)
+    # sorted by id for deterministic first-match-wins
+    assert [r.id for r in recipes] == sorted(r.id for r in recipes)
+
+
+def test_taxonomy_match_prefers_family_over_fallback():
+    recipe = match_recipe(
+        "semgrep",
+        "javascript.sequelize.security.audit.sequelize-injection-express.express-sequelize-injection",
+    )
+    assert recipe is not None
+    assert recipe.id == "sqli-sequelize"
+    assert match_recipe("semgrep", "something.totally.unknown.rule") is None
+    api_key = match_recipe("gitleaks", "generic-api-key")
+    assert api_key is not None
+    assert api_key.id == "secret-api-key"
+
+
+def test_taxonomy_guard_hit_and_sanitizer_gate():
+    recipe = match_recipe("semgrep", "python.flask.security.xss")
+    _ = recipe  # unrelated family: generic gate still applies
+    assert sanitizer_gate("eval(req.query.q)") == "undefended"
+    sql = match_recipe(
+        "semgrep", "javascript.sequelize.security.audit.foo.express-sequelize-injection"
+    )
+    assert sql is not None
+    assert sql.guard_hit("db.query(q, { replacements: { id } })") is not None
+    assert sql.guard_hit("db.query('SELECT ' + req.query.q)") is None
+    assert sanitizer_gate("db.query(q, { replacements: { id } })", sql.guards) == "defended"
+
+
+def test_parse_semgrep_uses_recipe_taxonomy():
+    seq_check = (
+        "javascript.sequelize.security.audit."
+        "sequelize-injection-express.express-sequelize-injection"
+    )
+    payload = json.dumps(
+        {
+            "results": [
+                {
+                    "check_id": seq_check,
+                    "path": "routes/search.ts",
+                    "start": {"line": 10},
+                    "extra": {"message": "m", "severity": "ERROR"},
+                },
+                {
+                    "check_id": "totally.unknown.rule",
+                    "path": "a.py",
+                    "start": {"line": 1},
+                    "extra": {"message": "m", "severity": "WARNING"},
+                },
+            ]
+        }
+    )
+    findings = parse_semgrep(payload)
+    assert findings[0].taxonomy == "sqli-sequelize"
+    assert findings[0].id != findings[1].id
+    assert findings[1].taxonomy == "semgrep"
+
+
+def test_recipe_for_finding_prefers_stored_id():
+    leak = {"RuleID": "generic-api-key", "File": "a.env", "StartLine": 1, "Description": "d"}
+    findings = parse_gitleaks(json.dumps([leak]))
+    assert len(findings) == 1
+    assert findings[0].taxonomy == "secret-api-key"
+    recipe = recipe_for_finding(findings[0])
+    assert recipe is not None
+    assert recipe.id == "secret-api-key"

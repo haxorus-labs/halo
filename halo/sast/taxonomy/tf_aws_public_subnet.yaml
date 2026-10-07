@@ -1,0 +1,16 @@
+id: tf-aws-public-subnet
+version: 1
+title: AWS subnet with public IP mapping enabled
+match:
+  tool: semgrep
+  check_ids:
+    - "*aws-subnet-has-public-ip*"
+severity: MEDIUM
+cwe: CWE-284
+guards:
+  - "map_public_ip_on_launch\\s*=\\s*false"
+notes: >
+  Subnets that auto-assign public IPs widen exposure. An explicit
+  map_public_ip_on_launch = false refutes the finding.
+mutants: []
+evidence: []

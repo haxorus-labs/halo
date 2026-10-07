@@ -1,0 +1,18 @@
+id: express-dir-listing
+version: 1
+title: Express static serving may allow directory listing
+match:
+  tool: semgrep
+  check_ids:
+    - "*check-directory-listing*"
+severity: LOW
+cwe: CWE-548
+guards:
+  - "dotfiles\\s*:\\s*['\"]deny['\"]"
+  - "index\\s*:\\s*false"
+notes: >
+  express.static serves index files and may expose listings depending on
+  options. Explicit deny/false options refute the finding; otherwise confirm
+  by requesting the directory URL.
+mutants: []
+evidence: []

@@ -1,0 +1,18 @@
+id: js-pug-explicit-unescape
+version: 1
+title: Pug explicit unescaped interpolation (!{})
+match:
+  tool: semgrep
+  check_ids:
+    - "*explicit-unescape*"
+severity: HIGH
+cwe: CWE-79
+guards:
+  - "#\\{"
+notes: >
+  Pug `!{...}` renders unescaped HTML; `#{...}` escapes. Escaped
+  interpolation in the slice refutes the finding, unescaped `!{}` with
+  request data upholds it.
+mutants:
+  - "<img src=x onerror=alert(1)>"
+evidence: []

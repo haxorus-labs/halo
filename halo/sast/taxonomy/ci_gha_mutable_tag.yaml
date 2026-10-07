@@ -1,0 +1,17 @@
+id: ci-gha-mutable-tag
+version: 1
+title: GitHub Actions step pinned to mutable tag/branch
+match:
+  tool: semgrep
+  check_ids:
+    - "*mutable-action-tag*"
+severity: LOW
+cwe: CWE-829
+guards:
+  - "@[0-9a-f]{40}\\b"
+notes: >
+  Mutable tags/branches can be silently repointed by the action owner
+  (supply-chain risk). A full 40-char commit SHA in the slice refutes the
+  finding. CI hygiene, not runtime exploitability.
+mutants: []
+evidence: []

@@ -1,0 +1,22 @@
+id: js-open-redirect
+version: 1
+title: Open redirect on request-controlled URL
+match:
+  tool: semgrep
+  check_ids:
+    - "*express-open-redirect*"
+    - "*open-redirect*"
+severity: MEDIUM
+cwe: CWE-601
+guards:
+  - "allowlist|whitelist"
+  - "new URL\\("
+  - "startsWith\\("
+  - "===?\\s*['\"]/"
+notes: >
+  Exact-match allowlists or same-origin enforcement refute the finding.
+  Substring checks (url.includes) do NOT refute it.
+mutants:
+  - "https://trusted.com.evil.com"
+  - "//evil.com"
+evidence: []

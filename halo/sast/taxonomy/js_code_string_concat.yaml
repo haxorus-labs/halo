@@ -1,0 +1,17 @@
+id: js-code-string-concat
+version: 1
+title: Dynamic code string concatenation
+match:
+  tool: semgrep
+  check_ids:
+    - "*code-string-concat*"
+severity: HIGH
+cwe: CWE-95
+guards:
+  - "JSON\\.stringify\\("
+notes: >
+  Building executable code by concatenating strings is injection-prone.
+  Structured serialization (JSON.stringify) or static-only parts refute it.
+mutants:
+  - "';require(\"child_process\").exec('id');//"
+evidence: []

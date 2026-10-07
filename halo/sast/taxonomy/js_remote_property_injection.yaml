@@ -1,0 +1,20 @@
+id: js-remote-property-injection
+version: 1
+title: Remote property injection via request-controlled object keys
+match:
+  tool: semgrep
+  check_ids:
+    - "*remote-property-injection*"
+severity: HIGH
+cwe: CWE-915
+guards:
+  - "allowlist|whitelist"
+  - "hasOwnProperty"
+  - "Object\\.keys\\("
+notes: >
+  Assigning request-controlled keys onto objects enables pollution/override.
+  Allowlisted keys or ownership checks refute the finding.
+mutants:
+  - '{"__proto__": {"x": 1}}'
+  - '{"constructor": {"prototype": {"x": 1}}}'
+evidence: []

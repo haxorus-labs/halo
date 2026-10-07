@@ -1,0 +1,20 @@
+id: js-script-tag-sink
+version: 1
+title: Untrusted value flowing into script tag context
+match:
+  tool: semgrep
+  check_ids:
+    - "*unknown-value-with-script-tag*"
+severity: MEDIUM
+cwe: CWE-79
+guards:
+  - "DOMPurify"
+  - "escapeHtml|escape-html|he\\.encode"
+  - "textContent"
+notes: >
+  Values rendered inside <script> contexts execute. Encoding, textContent
+  assignment, or DOMPurify refute the finding; confirm the value reaches the
+  tag unencoded before upholding.
+mutants:
+  - "</script><script>alert(1)</script>"
+evidence: []

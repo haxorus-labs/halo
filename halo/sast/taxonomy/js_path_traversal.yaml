@@ -1,0 +1,22 @@
+id: js-path-traversal
+version: 1
+title: Path traversal via path.join/resolve on request input
+match:
+  tool: semgrep
+  check_ids:
+    - "*path-join-resolve-traversal*"
+    - "*path-traversal*"
+severity: HIGH
+cwe: CWE-22
+guards:
+  - "startsWith\\("
+  - "path\\.normalize\\("
+  - "path\\.basename\\("
+  - "allowlist|whitelist"
+notes: >
+  path.join/resolve do not contain '..' on their own. A normalize +
+  startsWith(root) check, basename extraction, or an allowlist refutes it.
+mutants:
+  - "../../etc/passwd"
+  - "..%2f..%2fetc%2fpasswd"
+evidence: []

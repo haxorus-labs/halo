@@ -1,0 +1,16 @@
+id: js-non-literal-regexp
+version: 1
+title: Non-literal regular expression (ReDoS / injection risk)
+match:
+  tool: semgrep
+  check_ids:
+    - "*detect-non-literal-regexp*"
+severity: LOW
+cwe: CWE-1333
+guards: []
+notes: >
+  Dynamically built regexes are usually audit findings, not directly
+  exploitable. Uphold only if the pattern derives from request input and a
+  catastrophic-backtracking shape is plausible.
+mutants: []
+evidence: []

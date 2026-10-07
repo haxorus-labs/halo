@@ -13,6 +13,7 @@ from halo.config import load_settings
 from halo.config.models import HaloProvider, configure_sdk_api_route
 from halo.core.inputs import make_model_settings
 from halo.sast.findings import Finding  # noqa: TC001
+from halo.sast.taxonomy import Recipe  # noqa: TC001
 
 
 logger = logging.getLogger(__name__)
@@ -30,12 +31,19 @@ adequate guard is present. Respond with ONLY a JSON object:
 {"verdict": "CONFIRMED"|"REFUTED"|"UNVERIFIED", "reason": "..."}."""
 
 
-def sanitizer_gate(source_slice: str) -> str:
-    """Cheap syntactic check. Returns 'defended', 'undefended', or 'inconclusive'."""
+def sanitizer_gate(source_slice: str, extra_guards: tuple[str, ...] = ()) -> str:
+    """Cheap syntactic check. Returns 'defended', 'undefended', or 'inconclusive'.
+
+    ``extra_guards`` are recipe guard regexes checked in addition to the
+    generic patterns; the first hit wins.
+    """
     if not source_slice.strip():
         return "inconclusive"
     if _SATISFACTORY.search(source_slice):
         return "defended"
+    for pattern in extra_guards:
+        if re.search(pattern, source_slice):
+            return "defended"
     return "undefended"
 
 
@@ -43,8 +51,14 @@ async def adversarial_verify(
     finding: Finding,
     source_slice: str,
     settings: Any,
+    recipe: Recipe | None = None,
 ) -> dict[str, str]:
-    """One LLM call per finding; degrade gracefully when no model is configured."""
+    """One LLM call per finding; degrade gracefully when no model is configured.
+
+    When a taxonomy ``recipe`` is known, its title, severity, guard list, and
+    notes are appended to the prompt so the verdict is rule-aware instead of
+    generic.
+    """
     cfg = settings or load_settings()
     model_name = (cfg.llm.model or "").strip()
     if not model_name:
@@ -58,6 +72,14 @@ async def adversarial_verify(
         f"Code slice:\n```\n{source_slice[:4000]}\n```\n\n"
         "Respond with ONLY the JSON object described in the system prompt."
     )
+    if recipe is not None:
+        guards = "\n".join(f"- {g}" for g in recipe.guards) or "(none known)"
+        user_msg += (
+            f"\n\nTaxonomy {recipe.id} (v{recipe.version}): {recipe.title} "
+            f"[{recipe.severity}, {recipe.cwe}].\n"
+            f"Known adequate guards (presence refutes the finding):\n{guards}\n"
+            f"Analyst notes: {recipe.notes}"
+        )
     try:
         response = await model.get_response(
             system_instructions=ADVERSARIAL_SYSTEM_PROMPT,

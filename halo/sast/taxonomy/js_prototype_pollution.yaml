@@ -1,0 +1,22 @@
+id: js-prototype-pollution
+version: 1
+title: Prototype pollution via recursive merge/assignment loop
+match:
+  tool: semgrep
+  check_ids:
+    - "*prototype-pollution*"
+severity: HIGH
+cwe: CWE-1321
+guards:
+  - "Object\\.freeze\\("
+  - "Object\\.create\\(null\\)"
+  - "__proto__"
+  - "hasOwnProperty"
+  - "new Map\\("
+notes: >
+  Recursive assignment of attacker-controlled keys pollutes Object.prototype.
+  Explicit __proto__/constructor guards, null-prototype objects, or Maps
+  refute the finding.
+mutants:
+  - '{"__proto__": {"polluted": true}}'
+evidence: []

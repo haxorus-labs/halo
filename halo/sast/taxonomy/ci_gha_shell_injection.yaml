@@ -1,0 +1,19 @@
+id: ci-gha-shell-injection
+version: 1
+title: GitHub Actions shell injection via expression interpolation
+match:
+  tool: semgrep
+  check_ids:
+    - "*run-shell-injection*"
+    - "*curl-pipe-shell*"
+severity: MEDIUM
+cwe: CWE-78
+guards: []
+notes: >
+  '${{ ... }}' interpolated into a `run:` block (or curl-piped-to-shell)
+  executes attacker-controlled workflow input. Hard to refute statically;
+  confirm whether the interpolated value is attacker-reachable (e.g. issue
+  title/body) before upholding.
+mutants:
+  - "${{ github.event.issue.title }}"
+evidence: []

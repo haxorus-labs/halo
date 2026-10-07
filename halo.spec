@@ -29,6 +29,10 @@ for xml_file in halo_root.rglob('*.xml'):
     rel_path = xml_file.relative_to(project_root)
     datas.append((str(xml_file), str(rel_path.parent)))
 
+for yaml_file in halo_root.rglob('sast/**/*.yaml'):
+    rel_path = yaml_file.relative_to(project_root)
+    datas.append((str(yaml_file), str(rel_path.parent)))
+
 # Prebuilt local-viewer SPA (served by `halo view`).
 viewer_static = halo_root / 'interface' / 'viewer' / 'static'
 for asset in viewer_static.rglob('*'):

@@ -1,0 +1,15 @@
+id: tf-aws-cwlogs-unencrypted
+version: 1
+title: AWS CloudWatch log group without KMS encryption
+match:
+  tool: semgrep
+  check_ids:
+    - "*cloudwatch-log-group-unencrypted*"
+severity: LOW
+cwe: CWE-312
+guards:
+  - "kms_key_id"
+notes: >
+  Unencrypted log groups risk log-data exposure. A kms_key_id refutes it.
+mutants: []
+evidence: []

@@ -1,0 +1,16 @@
+id: supply-npm-release-age
+version: 1
+title: npm dependency below minimum release age
+match:
+  tool: semgrep
+  check_ids:
+    - "*npm-missing-minimum-release-age*"
+severity: LOW
+cwe: CWE-829
+guards: []
+notes: >
+  Freshly published packages carry higher supply-chain risk, but this is a
+  heuristic signal, not a vulnerability. Uphold only alongside other
+  compromise indicators.
+mutants: []
+evidence: []

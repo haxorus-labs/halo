@@ -1,0 +1,16 @@
+id: tf-aws-elb-logs
+version: 1
+title: AWS ELB without access logging
+match:
+  tool: semgrep
+  check_ids:
+    - "*elb-access-logs-not-enabled*"
+severity: LOW
+cwe: CWE-778
+guards:
+  - "access_logs\\s*\\{"
+notes: >
+  Missing access logs hurt incident response, not runtime exploitability.
+  An access_logs block refutes the finding.
+mutants: []
+evidence: []

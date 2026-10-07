@@ -1,0 +1,16 @@
+id: tf-aws-elb-tls
+version: 1
+title: AWS load balancer with outdated TLS policy
+match:
+  tool: semgrep
+  check_ids:
+    - "*insecure-load-balancer-tls-version*"
+severity: MEDIUM
+cwe: CWE-326
+guards:
+  - "TLS-1-2"
+  - "TLS-1-3"
+notes: >
+  A modern ssl_policy naming TLS 1.2+ refutes the finding.
+mutants: []
+evidence: []

@@ -1,0 +1,20 @@
+id: express-sendfile
+version: 1
+title: Express res.sendFile with unvalidated path
+match:
+  tool: semgrep
+  check_ids:
+    - "*res-sendfile*"
+severity: MEDIUM
+cwe: CWE-22
+guards:
+  - "root\\s*:"
+  - "dotfiles\\s*:"
+  - "path\\.(resolve|normalize|join)\\("
+notes: >
+  A `root` option constrains the file to one directory. Without it, confirm
+  the filename derives from request input before upholding.
+mutants:
+  - "../../etc/passwd"
+  - "..%2f..%2fetc%2fpasswd"
+evidence: []
