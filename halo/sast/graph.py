@@ -48,10 +48,20 @@ def _copy_into_run_dir(src_graph: Path, run_dir: Path) -> Path | None:
     try:
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src_graph, dest)
+        # Preserve graphify's own interactive visualization alongside the data.
+        # It embeds the pre-enrichment code topology (findings/actor overlays
+        # added later live in the Halo view, not here).
+        src_html = src_graph.parent / "graph.html"
+        if src_html.is_file():
+            shutil.copy2(src_html, dest.parent / "graph.html")
     except OSError as exc:
         logger.warning("could not copy graph.json into run dir: %s", exc)
         return None
     return dest if dest.is_file() else None
+
+
+def graph_html_path_for(run_dir: Path) -> Path:
+    return run_dir / "graphify-out" / "graph.html"
 
 
 def build_graph(source_path: Path, run_dir: Path) -> Path | None:

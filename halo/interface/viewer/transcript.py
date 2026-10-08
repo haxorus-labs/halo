@@ -93,6 +93,14 @@ def read_graph_json(run_dir: Path) -> dict[str, Any]:
     return data if isinstance(data, dict) else {}
 
 
+def read_graph_html(run_dir: Path) -> str:
+    """Graphify's own interactive visualization (empty until ``kg_build`` runs)."""
+    try:
+        return (run_dir / "graphify-out" / "graph.html").read_text(encoding="utf-8")
+    except OSError:
+        return ""
+
+
 def _load_json(path: Path, *, default: Any) -> Any:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
@@ -103,6 +111,7 @@ def _load_json(path: Path, *, default: Any) -> Any:
 __all__ = [
     "build_run_state",
     "primary_target",
+    "read_graph_html",
     "read_graph_json",
     "read_report_markdown",
     "read_run_summary",

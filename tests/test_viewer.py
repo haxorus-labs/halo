@@ -10,11 +10,14 @@ import urllib.request
 from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 
+import pytest
+
 from halo.core.paths import latest_run_dir, runs_base_dir
 from halo.interface.viewer.cli import _state_label, run_view
 from halo.interface.viewer.server import serve
 from halo.interface.viewer.transcript import (
     build_run_state,
+    read_graph_html,
     read_graph_json,
     read_report_markdown,
     read_run_summary,
@@ -25,8 +28,6 @@ from halo.interface.viewer.transcript import (
 if TYPE_CHECKING:
     from collections.abc import Mapping
     from pathlib import Path
-
-    import pytest
 
 
 def _make_run(base: Path, name: str, *, status: str, end_time: str | None) -> Path:
@@ -798,6 +799,56 @@ def test_server_serves_graph_endpoint(tmp_path: Path, monkeypatch: pytest.Monkey
         payload = json.loads(body)
         assert [n["id"] for n in payload["nodes"]] == ["actor:anon"]
         assert payload["links"][0]["relation"] == "allows"
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+
+
+def test_read_graph_html_missing_and_present(tmp_path: Path) -> None:
+    assert read_graph_html(tmp_path / "nope") == ""
+    run_dir = tmp_path / "run"
+    out_dir = run_dir / "graphify-out"
+    out_dir.mkdir(parents=True)
+    (out_dir / "graph.html").write_text("<html>viz</html>", encoding="utf-8")
+    assert read_graph_html(run_dir) == "<html>viz</html>"
+
+
+def test_server_serves_graph_html(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    run_dir = _make_run(tmp_path, "htmlg", status="completed", end_time="2026-01-01T00:00:00Z")
+    (run_dir / "graphify-out").mkdir(parents=True)
+    (run_dir / "graphify-out" / "graph.html").write_text("<html>viz</html>", encoding="utf-8")
+
+    assets = tmp_path / "bundle"
+    (assets / "assets").mkdir(parents=True)
+    (assets / "index.html").write_text("<!doctype html><div id=root></div>", encoding="utf-8")
+    monkeypatch.setattr("halo.interface.viewer.server.bundle_dir", lambda: assets)
+
+    httpd, url, token = serve(run_dir, open_browser=False)
+    try:
+        cookie = _session_cookie(url, token)
+        status, ctype, body = _get(f"{url}/api/graph_html", cookie=cookie)
+        assert status == 200
+        assert "text/html" in ctype
+        assert body == b"<html>viz</html>"
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+
+
+def test_server_graph_html_missing_is_404(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    run_dir = _make_run(tmp_path, "nohtml", status="completed", end_time="2026-01-01T00:00:00Z")
+
+    assets = tmp_path / "bundle"
+    (assets / "assets").mkdir(parents=True)
+    (assets / "index.html").write_text("<!doctype html><div id=root></div>", encoding="utf-8")
+    monkeypatch.setattr("halo.interface.viewer.server.bundle_dir", lambda: assets)
+
+    httpd, url, token = serve(run_dir, open_browser=False)
+    try:
+        cookie = _session_cookie(url, token)
+        with pytest.raises(urllib.error.HTTPError) as exc:
+            _get(f"{url}/api/graph_html", cookie=cookie)
+        assert exc.value.code == 404
     finally:
         httpd.shutdown()
         httpd.server_close()

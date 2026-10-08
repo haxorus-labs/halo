@@ -180,6 +180,11 @@ export async function fetchGraph(runName?: string | null): Promise<KnowledgeGrap
   return { nodes: asNodeList(obj?.nodes), edges: asEdgeList(rawEdges) };
 }
 
+/** URL of graphify's own interactive visualization (404s when never built). */
+export function graphHtmlUrl(runName?: string | null): string {
+  return "/api/graph_html" + runQuery(runName);
+}
+
 /** One-shot fetch of every endpoint (used on mount and on final settle). */
 export async function fetchAll(runName?: string | null): Promise<LoadedRun> {
   const { summary, raw, finished } = await fetchRunSummary(runName);

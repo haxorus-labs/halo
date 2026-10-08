@@ -31,6 +31,7 @@ from halo.interface.viewer import auth
 from halo.interface.viewer.transcript import (
     build_run_state,
     primary_target,
+    read_graph_html,
     read_graph_json,
     read_report_markdown,
     read_run_summary,
@@ -282,12 +283,32 @@ def _make_handler(state: _ViewerState) -> type[BaseHTTPRequestHandler]:
                 self._send_json(HTTPStatus.OK, read_vulnerabilities(run_dir))
             elif path == "/api/report":
                 self._send_json(HTTPStatus.OK, {"markdown": read_report_markdown(run_dir)})
-            elif path == "/api/transcript":
+            else:
+                self._serve_run_data(path, run_dir)
+
+        def _serve_run_data(self, path: str, run_dir: Path) -> None:
+            if path == "/api/transcript":
                 self._send_json(HTTPStatus.OK, build_run_state(run_dir))
             elif path == "/api/graph":
                 self._send_json(HTTPStatus.OK, read_graph_json(run_dir))
+            elif path == "/api/graph_html":
+                self._serve_graph_html(run_dir)
             else:
                 self._send_json(HTTPStatus.NOT_FOUND, {"error": "unknown endpoint"})
+
+        def _serve_graph_html(self, run_dir: Path) -> None:
+            html = read_graph_html(run_dir)
+            if not html:
+                self._send_json(HTTPStatus.NOT_FOUND, {"error": "no graph visualization"})
+                return
+            body = html.encode("utf-8")
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            # Same-origin iframe embed only; never grant wider framing.
+            self.send_header("X-Frame-Options", "SAMEORIGIN")
+            self.end_headers()
+            self.wfile.write(body)
 
         def _handle_auth_status(self) -> None:
             # The cached verified email is only disclosed to a caller holding this

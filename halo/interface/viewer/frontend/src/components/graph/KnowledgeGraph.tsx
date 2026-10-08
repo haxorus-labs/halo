@@ -9,6 +9,7 @@ import {
   useNodesState,
   useEdgesState,
   useReactFlow,
+  MarkerType,
   type Node,
   type Edge,
 } from "@xyflow/react";
@@ -16,6 +17,7 @@ import dagre from "@dagrejs/dagre";
 import GraphSkeleton from "../live/GraphSkeleton";
 import {
   fetchGraph,
+  graphHtmlUrl,
   type KnowledgeGraphEdge,
   type KnowledgeGraphNode,
 } from "@/data/serverSource";
@@ -34,13 +36,33 @@ const SEVERITY_HEX: Record<string, string> = {
   low: "#22c55e",
 };
 
+// Same categorical palette family graphify uses for communities.
+const COMMUNITY_HEX = [
+  "#4E79A7",
+  "#F28E2B",
+  "#E15759",
+  "#76B7B2",
+  "#59A14F",
+  "#EDC948",
+  "#B07AA1",
+  "#FF9DA7",
+  "#9C755F",
+  "#BAB0AC",
+];
+
+function communityColor(node: KnowledgeGraphNode): string {
+  const raw = node.community;
+  const idx = typeof raw === "number" && Number.isFinite(raw) ? Math.abs(raw) : 0;
+  return COMMUNITY_HEX[idx % COMMUNITY_HEX.length];
+}
+
 function nodeColor(node: KnowledgeGraphNode): string {
   if (node.type === "finding") {
     return SEVERITY_HEX[String(node.severity ?? "").toLowerCase()] ?? "#f97316";
   }
   if (node.type === "actor") return "#3b82f6";
   if (node.type === "route") return "#a855f7";
-  return "#555";
+  return communityColor(node);
 }
 
 function nodeLabel(node: KnowledgeGraphNode): string {
@@ -104,7 +126,7 @@ function buildSubgraph(
 function layout(nodes: KnowledgeGraphNode[], edges: KnowledgeGraphEdge[]) {
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: "TB", nodesep: 40, ranksep: 70 });
+  g.setGraph({ rankdir: "LR", nodesep: 60, ranksep: 140 });
   const flowNodes: Node[] = nodes.map((n) => {
     g.setNode(n.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
     return {
@@ -118,13 +140,14 @@ function layout(nodes: KnowledgeGraphNode[], edges: KnowledgeGraphEdge[]) {
     g.setEdge(String(e.source), String(e.target));
     const rel = String(e.relation ?? "");
     const color =
-      rel === "denies" ? "#ef4444" : rel === "allows" ? "#22c55e" : rel === "targets" ? "#f97316" : "#2a2a2a";
+      rel === "denies" ? "#ef4444" : rel === "allows" ? "#22c55e" : rel === "targets" ? "#f97316" : "#4a4a4a";
     return {
       id,
       source: String(e.source),
       target: String(e.target),
       label: rel || undefined,
       style: { stroke: color, strokeWidth: rel ? 1.5 : 1 },
+      markerEnd: { type: MarkerType.ArrowClosed, color, width: 16, height: 16 },
     };
   });
   dagre.layout(g);
@@ -150,16 +173,45 @@ function KgNode({ data }: { data: { label: string; sub: string; color: string } 
 const nodeTypes = { kgNode: KgNode };
 
 function FitOnLoad({ version }: { version: number }) {
+  // Fit exactly once on first data — never again, so live refreshes and
+  // user zoom/pan are never yanked away (that was breaking zoom).
   const { fitView } = useReactFlow();
-  const fitted = useRef(0);
+  const fitted = useRef(false);
   useEffect(() => {
-    if (version !== fitted.current) {
-      fitted.current = version;
+    if (!fitted.current && version > 0) {
+      fitted.current = true;
       const t = setTimeout(() => fitView({ padding: 0.25, duration: 400 }), 80);
       return () => clearTimeout(t);
     }
   }, [version, fitView]);
   return null;
+}
+
+function ZoomControls() {
+  const { zoomIn, zoomOut, fitView } = useReactFlow();
+  const btn =
+    "flex items-center justify-center w-7 h-7 bg-[#111] text-white hover:bg-[#2a2a2a] transition-colors";
+  return (
+    <Controls
+      position="bottom-right"
+      showZoom={false}
+      showFitView={false}
+      showInteractive={false}
+      className="!bg-transparent !border-none !shadow-none"
+    >
+      <div className="flex flex-col overflow-hidden rounded-lg border border-[#222]">
+        <button onClick={() => zoomIn({ duration: 300 })} className={btn} title="Zoom in">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-3.5 h-3.5"><path d="M12 5v14M5 12h14" /></svg>
+        </button>
+        <button onClick={() => zoomOut({ duration: 300 })} className={`${btn} border-y border-[#222]`} title="Zoom out">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-3.5 h-3.5"><path d="M5 12h14" /></svg>
+        </button>
+        <button onClick={() => fitView({ padding: 0.25, duration: 300 })} className={btn} title="Fit view">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-3.5 h-3.5"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></svg>
+        </button>
+      </div>
+    </Controls>
+  );
 }
 
 interface KnowledgeGraphProps {
@@ -175,6 +227,8 @@ export default function KnowledgeGraph({ runName, live }: KnowledgeGraphProps) {
   const [activeRelations, setActiveRelations] = useState<Set<string> | null>(null);
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [renderer, setRenderer] = useState<"halo" | "graphify">("halo");
+  const [graphifyUrl, setGraphifyUrl] = useState<string | null>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
@@ -200,6 +254,31 @@ export default function KnowledgeGraph({ runName, live }: KnowledgeGraphProps) {
       if (timer) clearTimeout(timer);
     };
   }, [runName, live]);
+
+  // Graphify's own visualization, fetched once per run (blob URL avoids a
+  // second multi-MB download by the iframe). Null = not built for this run.
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    const load = async () => {
+      try {
+        const res = await fetch(graphHtmlUrl(runName), { cache: "no-store" });
+        if (!res.ok) return;
+        const blob = await res.blob();
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(new Blob([blob], { type: "text/html" }));
+        setGraphifyUrl(objectUrl);
+      } catch {
+        /* offline or missing — Halo view remains available */
+      }
+    };
+    setGraphifyUrl(null);
+    void load();
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [runName]);
 
   const relations = useMemo(() => {
     const counts = new Map<string, number>();
@@ -299,6 +378,31 @@ export default function KnowledgeGraph({ runName, live }: KnowledgeGraphProps) {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
+        <div className="flex overflow-hidden rounded-lg border border-[#2a2a2a]">
+          {(["halo", "graphify"] as const).map((r) => (
+            <button
+              key={r}
+              onClick={() => setRenderer(r)}
+              disabled={r === "graphify" && graphifyUrl === null}
+              title={
+                r === "graphify"
+                  ? graphifyUrl === null
+                    ? "Graphify visualization was not built for this run"
+                    : "Graphify force-directed view (needs CDN access for vis-network)"
+                  : "Halo security-focused view"
+              }
+              className={`px-3 py-1.5 text-xs transition-colors ${
+                renderer === r
+                  ? "bg-white font-semibold text-black"
+                  : "bg-[#0d0d0d] text-[#888] hover:text-white"
+              } disabled:cursor-not-allowed disabled:opacity-40`}
+            >
+              {r === "halo" ? "Halo view" : "Graphify view"}
+            </button>
+          ))}
+        </div>
+        {renderer === "halo" && (
+          <>
         <div className="relative">
           <input
             value={query}
@@ -354,14 +458,30 @@ export default function KnowledgeGraph({ runName, live }: KnowledgeGraphProps) {
           );
         })}
         <div className="ml-auto text-xs text-[#555]">
+          {renderer === "halo" ? (
+            <>
           {sub.nodes.length.toLocaleString()} / {sub.total.toLocaleString()} nodes
           {sub.capped && " (capped — search to find more)"}
+            </>
+          ) : (
+            <>code topology at build time · finding overlays live in Halo view</>
+          )}
           {live && <span className="ml-2 text-blue-500">● live</span>}
         </div>
+          </>
+        )}
       </div>
 
       <div className="flex gap-3">
         <div className="relative h-[560px] min-w-0 flex-1 rounded-xl border border-[#222] bg-black">
+          {renderer === "graphify" && graphifyUrl ? (
+            <iframe
+              title="Graphify knowledge graph"
+              src={graphifyUrl}
+              className="h-full w-full rounded-xl"
+              sandbox="allow-scripts"
+            />
+          ) : (
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -380,17 +500,12 @@ export default function KnowledgeGraph({ runName, live }: KnowledgeGraphProps) {
           >
             <Background color="#111" gap={20} />
             <FitOnLoad version={version} />
-            <Controls
-              position="bottom-right"
-              showZoom={false}
-              showFitView={false}
-              showInteractive={false}
-              className="!bg-transparent !border-none !shadow-none"
-            />
+            <ZoomControls />
           </ReactFlow>
+          )}
         </div>
 
-        {selected && (
+        {renderer === "halo" && selected && (
           <div className="w-72 shrink-0 overflow-y-auto rounded-xl border border-[#222] bg-[#0d0d0d] p-4">
             <div className="mb-1 flex items-center gap-2">
               <span
