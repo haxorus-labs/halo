@@ -126,6 +126,60 @@ export async function fetchTranscript(runName?: string | null): Promise<Transcri
   };
 }
 
+export interface KnowledgeGraphNode {
+  id: string;
+  label?: string;
+  type?: string;
+  state?: string;
+  severity?: string;
+  taxonomy?: string;
+  source_file?: string;
+  source_location?: string;
+  role?: string;
+  community?: number;
+  community_name?: string;
+  [key: string]: unknown;
+}
+
+export interface KnowledgeGraphEdge {
+  source: string;
+  target: string;
+  relation?: string;
+  confidence?: string;
+  [key: string]: unknown;
+}
+
+export interface KnowledgeGraph {
+  nodes: KnowledgeGraphNode[];
+  edges: KnowledgeGraphEdge[];
+}
+
+function asNodeList(value: unknown): KnowledgeGraphNode[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (n): n is KnowledgeGraphNode => typeof n === "object" && n !== null && "id" in n
+  );
+}
+
+function asEdgeList(value: unknown): KnowledgeGraphEdge[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (e): e is KnowledgeGraphEdge =>
+      typeof e === "object" &&
+      e !== null &&
+      "source" in e &&
+      "target" in e
+  );
+}
+
+/** Fetch the knowledge graph (empty when the scan never ran ``kg_build``). */
+export async function fetchGraph(runName?: string | null): Promise<KnowledgeGraph> {
+  const obj = (await getJson("/api/graph" + runQuery(runName))) as Record<string, unknown>;
+  // Real graphify graphs store edges under ``links``; synthetic ones under ``edges``.
+  const rawEdges = Array.isArray(obj?.links) ? obj.links : obj?.edges;
+  return { nodes: asNodeList(obj?.nodes), edges: asEdgeList(rawEdges) };
+}
+
 /** One-shot fetch of every endpoint (used on mount and on final settle). */
 export async function fetchAll(runName?: string | null): Promise<LoadedRun> {
   const { summary, raw, finished } = await fetchRunSummary(runName);

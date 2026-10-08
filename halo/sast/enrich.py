@@ -8,6 +8,7 @@ from pathlib import Path  # noqa: TC003
 from typing import Any, cast
 
 from halo.sast.findings import Finding  # noqa: TC001
+from halo.sast.graph import writable_edge_list
 
 
 logger = logging.getLogger(__name__)
@@ -21,11 +22,10 @@ def enrich_graph_json(graph_json: Path, findings: list[Finding]) -> Path:
         return graph_json
 
     nodes_raw = data.get("nodes")
-    edges_raw = data.get("edges")
-    if not isinstance(nodes_raw, list) or not isinstance(edges_raw, list):
+    if not isinstance(nodes_raw, list):
         return graph_json
     nodes = cast("list[dict[str, Any]]", nodes_raw)
-    edges = cast("list[dict[str, Any]]", edges_raw)
+    edges = writable_edge_list(data)
 
     node_ids = {str(n.get("id")) for n in nodes}
     for finding in findings:

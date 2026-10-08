@@ -355,3 +355,35 @@ def test_kg_auth_tools_roundtrip(tmp_path):
         assert any(n.get("type") == "route" for n in graph["nodes"])
     finally:
         kg_tools.hydrate_kg_from_disk.__globals__["_state_dir"] = None
+
+
+def test_enrich_and_authmap_work_on_links_style_graph(tmp_path):
+    graph = tmp_path / "graph.json"
+    graph.write_text(
+        json.dumps(
+            {
+                "nodes": [{"id": "routes_login", "label": "login"}],
+                "links": [{"source": "routes_login", "target": "db_query", "relation": "calls"}],
+            }
+        )
+    )
+    finding = Finding(
+        id="f9",
+        tool="semgrep",
+        rule_id="r",
+        file="routes/login.ts",
+        line=3,
+        sink_symbol="routes_login",
+        message="m",
+        taxonomy="t",
+        severity="HIGH",
+    )
+    enrich_graph_json(graph, [finding])
+    record_auth_probes(graph, [{"route": "/login", "persona": "anon", "verdict": "allows"}])
+    data = json.loads(graph.read_text())
+    assert "edges" not in data
+    assert any(n["id"] == "finding:f9" for n in data["nodes"])
+    assert any(n["id"] == "actor:anon" for n in data["nodes"])
+    relations = {e["relation"] for e in data["links"]}
+    assert {"targets", "allows"} <= relations
+    assert auth_for_route(data, "/login") == {"allows": ["anon"], "denies": []}

@@ -15,6 +15,8 @@ from pathlib import Path  # noqa: TC003
 from typing import Any, cast
 from urllib.parse import urlsplit
 
+from halo.sast.graph import iter_edges, writable_edge_list
+
 
 logger = logging.getLogger(__name__)
 
@@ -87,11 +89,10 @@ def record_auth_probes(graph_json: Path, probes: list[dict[str, Any]]) -> Path:
         data = {"nodes": [], "edges": []}
 
     nodes_raw = data.get("nodes")
-    edges_raw = data.get("edges")
-    if not isinstance(nodes_raw, list) or not isinstance(edges_raw, list):
+    if not isinstance(nodes_raw, list):
         return graph_json
     nodes = cast("list[dict[str, Any]]", nodes_raw)
-    edges = cast("list[dict[str, Any]]", edges_raw)
+    edges = writable_edge_list(data)
 
     node_ids = {str(n.get("id")) for n in nodes}
     edge_keys = {
@@ -130,11 +131,8 @@ def auth_for_route(graph: dict[str, Any], route: str) -> dict[str, list[str]]:
     path = normalize_route(route)
     target = f"route:{path}"
     result: dict[str, list[str]] = {ALLOWS: [], DENIES: []}
-    edges = graph.get("edges")
-    if not isinstance(edges, list):
-        return result
-    for edge in edges:
-        if not isinstance(edge, dict) or str(edge.get("target")) != target:
+    for edge in iter_edges(graph):
+        if str(edge.get("target")) != target:
             continue
         relation = str(edge.get("relation"))
         if relation not in result:
@@ -149,13 +147,8 @@ def auth_for_route(graph: dict[str, Any], route: str) -> dict[str, list[str]]:
 
 def unguarded_routes(graph: dict[str, Any]) -> list[str]:
     """Routes with a recorded anon ``allows`` edge (publicly reachable)."""
-    edges = graph.get("edges")
-    if not isinstance(edges, list):
-        return []
     routes = set()
-    for edge in edges:
-        if not isinstance(edge, dict):
-            continue
+    for edge in iter_edges(graph):
         if str(edge.get("source")) == "actor:anon" and str(edge.get("relation")) == ALLOWS:
             target = str(edge.get("target"))
             if target.startswith("route:"):

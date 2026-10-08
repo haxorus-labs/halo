@@ -31,6 +31,7 @@ from halo.interface.viewer import auth
 from halo.interface.viewer.transcript import (
     build_run_state,
     primary_target,
+    read_graph_json,
     read_report_markdown,
     read_run_summary,
     read_vulnerabilities,
@@ -283,6 +284,8 @@ def _make_handler(state: _ViewerState) -> type[BaseHTTPRequestHandler]:
                 self._send_json(HTTPStatus.OK, {"markdown": read_report_markdown(run_dir)})
             elif path == "/api/transcript":
                 self._send_json(HTTPStatus.OK, build_run_state(run_dir))
+            elif path == "/api/graph":
+                self._send_json(HTTPStatus.OK, read_graph_json(run_dir))
             else:
                 self._send_json(HTTPStatus.NOT_FOUND, {"error": "unknown endpoint"})
 

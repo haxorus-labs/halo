@@ -87,6 +87,12 @@ def read_report_markdown(run_dir: Path) -> str:
         return ""
 
 
+def read_graph_json(run_dir: Path) -> dict[str, Any]:
+    """The knowledge-graph JSON (empty until ``kg_build`` runs in the scan)."""
+    data = _load_json(run_dir / "graphify-out" / "graph.json", default={})
+    return data if isinstance(data, dict) else {}
+
+
 def _load_json(path: Path, *, default: Any) -> Any:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
@@ -97,6 +103,7 @@ def _load_json(path: Path, *, default: Any) -> Any:
 __all__ = [
     "build_run_state",
     "primary_target",
+    "read_graph_json",
     "read_report_markdown",
     "read_run_summary",
     "read_vulnerabilities",

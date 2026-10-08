@@ -7,6 +7,11 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path  # noqa: TC003
+from typing import TYPE_CHECKING, Any, cast
+
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 logger = logging.getLogger(__name__)
@@ -16,6 +21,26 @@ _GRAPHIFY_TIMEOUT_SECONDS = 900
 
 def graph_path_for(run_dir: Path) -> Path:
     return run_dir / "graphify-out" / "graph.json"
+
+
+def iter_edges(graph: dict[str, Any]) -> Iterator[dict[str, Any]]:
+    """Yield edge dicts from a graphify graph (``links``) or synthetic graph (``edges``)."""
+    for key in ("links", "edges"):
+        edges = graph.get(key)
+        if isinstance(edges, list):
+            for edge in edges:
+                if isinstance(edge, dict):
+                    yield edge
+
+
+def writable_edge_list(data: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return the edge list to append to, preferring the graph's native key."""
+    for key in ("links", "edges"):
+        edges: Any = data.get(key)
+        if isinstance(edges, list):
+            return cast("list[dict[str, Any]]", edges)
+    data["links"] = []
+    return cast("list[dict[str, Any]]", data["links"])
 
 
 def _copy_into_run_dir(src_graph: Path, run_dir: Path) -> Path | None:

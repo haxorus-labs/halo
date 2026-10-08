@@ -15,6 +15,7 @@ import { IssueSeveritySummary } from "@/components/IssueSeveritySummary";
 import AgentGraph from "@/components/live/AgentGraph";
 import { buildGraphAgents } from "@/components/live/AgentTranscript";
 import AgentDetailModal from "@/components/live/AgentDetailModal";
+import KnowledgeGraph from "@/components/graph/KnowledgeGraph";
 import { ScanPromptComposer } from "@/components/live/ScanPromptComposer";
 import { severityCounts, type ParsedRunSummary } from "@/lib/local-run-parser";
 import {
@@ -34,7 +35,7 @@ import {
 import { runTitle } from "@/lib/target-utils";
 import { RunDetails } from "@/components/RunDetails";
 
-export type View = "overview" | "issues" | "agents";
+export type View = "overview" | "issues" | "agents" | "graph";
 
 const SEVERITY_ORDER: VulnerabilitySeverity[] = ["critical", "high", "medium", "low"];
 const POLL_MS = 500;
@@ -275,6 +276,9 @@ export default function App() {
                     Agents ({agentCount})
                   </TabButton>
                 )}
+                <TabButton active={view === "graph"} onClick={() => userSetView("graph")}>
+                  Knowledge Graph
+                </TabButton>
               </div>
 
               {view === "overview" ? (
@@ -288,6 +292,8 @@ export default function App() {
                 />
               ) : view === "agents" && agentCount > 0 ? (
                 <AgentsTab run={run} canSteer={canSteer} />
+              ) : view === "graph" ? (
+                <KnowledgeGraph runName={activeRun} live={!run.finished} />
               ) : selected ? (
                 <div className="space-y-4">
                   <button

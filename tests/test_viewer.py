@@ -15,6 +15,7 @@ from halo.interface.viewer.cli import _state_label, run_view
 from halo.interface.viewer.server import serve
 from halo.interface.viewer.transcript import (
     build_run_state,
+    read_graph_json,
     read_report_markdown,
     read_run_summary,
     read_vulnerabilities,
@@ -748,6 +749,55 @@ def test_server_rejects_path_traversal(tmp_path: Path, monkeypatch: pytest.Monke
         # A traversal target must never leak the file; it falls back to index.html.
         _, _, body = _get(f"{url}/..%2f..%2fsecret.txt")
         assert b"top secret" not in body
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+
+
+def test_read_graph_json_missing_and_present(tmp_path: Path) -> None:
+    assert read_graph_json(tmp_path / "nope") == {}
+    run_dir = tmp_path / "run"
+    out_dir = run_dir / "graphify-out"
+    out_dir.mkdir(parents=True)
+    (out_dir / "graph.json").write_text(
+        json.dumps({"nodes": [{"id": "a"}], "links": []}), encoding="utf-8"
+    )
+    assert read_graph_json(run_dir)["nodes"] == [{"id": "a"}]
+
+
+def test_server_serves_graph_endpoint(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    run_dir = _make_run(tmp_path, "graphed", status="completed", end_time="2026-01-01T00:00:00Z")
+    (run_dir / "graphify-out").mkdir(parents=True)
+    (run_dir / "graphify-out" / "graph.json").write_text(
+        json.dumps(
+            {
+                "nodes": [{"id": "actor:anon", "type": "actor"}],
+                "links": [
+                    {
+                        "source": "actor:anon",
+                        "target": "route:/x",
+                        "relation": "allows",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assets = tmp_path / "bundle"
+    (assets / "assets").mkdir(parents=True)
+    (assets / "index.html").write_text("<!doctype html><div id=root></div>", encoding="utf-8")
+    monkeypatch.setattr("halo.interface.viewer.server.bundle_dir", lambda: assets)
+
+    httpd, url, token = serve(run_dir, open_browser=False)
+    try:
+        cookie = _session_cookie(url, token)
+        status, ctype, body = _get(f"{url}/api/graph", cookie=cookie)
+        assert status == 200
+        assert "application/json" in ctype
+        payload = json.loads(body)
+        assert [n["id"] for n in payload["nodes"]] == ["actor:anon"]
+        assert payload["links"][0]["relation"] == "allows"
     finally:
         httpd.shutdown()
         httpd.server_close()
