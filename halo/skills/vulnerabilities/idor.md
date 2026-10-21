@@ -176,6 +176,20 @@ query IDOR {
 5. **Transport variation** - Test across web, mobile, API, GraphQL, WebSocket, gRPC
 6. **Consistency check** - Same rule must hold regardless of transport, content-type, serialization, or gateway
 
+### Auth Matrix Tool
+
+`auth_matrix(base_url=..., operations=[...], personas=[...])` measures steps 1-3
+directly: it sends every operation as every persona and diffs the answers. It
+adds an implicit `anon` persona, flags anonymous access / horizontal IDOR /
+vertical escalation / method asymmetry, and returns advisory candidates with
+evidence *and* counterevidence. It reports only - it never files a finding.
+Set `owner` on an operation to enable the horizontal rule, `allowed_roles` for
+the vertical rule, and `public`/`shared` for operations that legitimately are.
+
+Two answers are never treated as access: a 2xx with a masked body (silent
+enforcement) and a redirect (pushed to a login). Both stay in the output as
+`empty` / `redirect` so you can tell "no finding" from "no probe".
+
 ## Validation
 
 1. Demonstrate access to an object not owned by the caller (content or metadata)
