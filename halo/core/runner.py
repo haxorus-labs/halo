@@ -387,9 +387,13 @@ async def run_halo_scan(
         targets = scan_config.get("targets") or []
         scan_mode = str(scan_config.get("scan_mode") or "deep")
         is_whitebox = any(t.get("type") in ("local_code", "repository") for t in targets)
-        if is_whitebox and _load_settings().sast.enabled:
-            from halo.agents.factory import register_agent_tools
+        from halo.agents.factory import register_agent_tools
+        from halo.tools.verify.race import race_burst
 
+        # A race burst only needs an HTTP target, so the tool is available in
+        # every scan mode rather than whitebox ones only.
+        register_agent_tools(race_burst)
+        if is_whitebox and _load_settings().sast.enabled:
             register_agent_tools(
                 sast_scan,
                 finding_verify,

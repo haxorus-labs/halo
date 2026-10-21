@@ -13,6 +13,7 @@ from halo.runtime.caido_handle import CaidoBootstrapHandle
 from halo.sast.fixtures import match_fixture
 from halo.sast.paths import resolve_source_root
 from halo.tools.proxy import caido_api
+from halo.tools.verify.materialize import materialize_request
 from halo.verify.replay import Oracle, result_to_dict, run_replays
 
 
@@ -59,35 +60,9 @@ async def _build_sender(
     modifications: dict[str, Any],
 ) -> Any:
     """Return an async send(i) closure dispatching the PoC via Caido replay."""
-    if request_id:
-        fetched = await caido_api.get_request_with_client(client, request_id, part="request")
-        if fetched is None or fetched.request.raw is None:
-            raise ValueError(f"request {request_id} not found or has no raw bytes")
-        original = fetched.request
-        components = caido_api.parse_raw_request(original.raw.decode("utf-8", errors="replace"))
-        full_url = caido_api.full_url_from_components(original, components, modifications)
-        modified = caido_api.apply_modifications(components, modifications, full_url)
-        method = str(modified["method"])
-        url = str(modified["url"])
-        headers = {str(k): str(v) for k, v in modified["headers"].items()}
-        body = str(modified["body"])
-    elif raw_request:
-        components = caido_api.parse_raw_request(raw_request)
-        first = str(components["url_path"])
-        if first.startswith(("http://", "https://")):
-            url = first
-        else:
-            host = str(components["headers"].get("Host") or "")
-            if not host:
-                raise ValueError("raw_request needs an absolute URL or a Host header")
-            url = f"http://{host}{first if first.startswith('/') else '/' + first}"
-        method = str(components["method"])
-        headers = {str(k): str(v) for k, v in components["headers"].items()}
-        body = str(components["body"])
-    else:
-        raise ValueError("pass request_id or raw_request")
+    spec = await materialize_request(client, request_id, raw_request, modifications)
     connection, raw = caido_api.build_raw_request(
-        method=method, url=url, headers=headers, body=body
+        method=spec.method, url=spec.url, headers=dict(spec.headers), body=spec.body
     )
 
     async def send(_index: int) -> dict[str, Any]:

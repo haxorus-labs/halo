@@ -1,5 +1,32 @@
-"""Deterministic verification primitives (replay harness)."""
+"""Deterministic verification primitives (replay harness, race detector)."""
 
+from halo.verify.http_sender import (
+    MODE_LOCAL,
+    MODE_SANDBOX,
+    build_command,
+    redact_headers,
+    redact_text,
+    select_mode,
+)
+from halo.verify.race import (
+    DURABILITY_FAILED,
+    DURABILITY_PASSED,
+    DURABILITY_SKIPPED,
+    VERDICT_ERROR,
+    VERDICT_NOT_A_RACE,
+    VERDICT_RACE_CONFIRMED,
+    VERDICT_RACE_SUSPECTED,
+    PhaseResult,
+    RaceResult,
+    RaceRun,
+    RequestSpec,
+    decide_verdict,
+    default_threshold,
+    phase_from_records,
+    race_result_to_dict,
+    run_race_in_session,
+    substitute_slots,
+)
 from halo.verify.replay import (
     MAX_RUNS,
     Oracle,
@@ -11,10 +38,33 @@ from halo.verify.replay import (
 
 
 __all__ = [
+    "DURABILITY_FAILED",
+    "DURABILITY_PASSED",
+    "DURABILITY_SKIPPED",
     "MAX_RUNS",
+    "MODE_LOCAL",
+    "MODE_SANDBOX",
+    "VERDICT_ERROR",
+    "VERDICT_NOT_A_RACE",
+    "VERDICT_RACE_CONFIRMED",
+    "VERDICT_RACE_SUSPECTED",
     "Oracle",
+    "PhaseResult",
+    "RaceResult",
+    "RaceRun",
     "ReplayResult",
+    "RequestSpec",
+    "build_command",
+    "decide_verdict",
+    "default_threshold",
     "evaluate_oracle",
+    "phase_from_records",
+    "race_result_to_dict",
+    "redact_headers",
+    "redact_text",
     "result_to_dict",
+    "run_race_in_session",
     "run_replays",
+    "select_mode",
+    "substitute_slots",
 ]
