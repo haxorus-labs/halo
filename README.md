@@ -121,6 +121,13 @@ target reset commands first when the PoC mutates state. `finding_verify`
 accepts a `control_status` from replaying the PoC as an authorized persona:
 a 2xx negative control refutes the finding without an LLM call.
 
+Race detection: `race_burst` fires the same request once at a time (the
+baseline) and then all at once (the burst) and compares the outcomes. A
+burst that wins clearly more requests than the baseline did proves the
+target left a read-modify-write window unguarded — RACE_CONFIRMED only when
+a durability probe shows the duplicated effect persisted. Burst targets are
+limited to the scan's declared targets and to local hosts.
+
 Cross-run memory: terminal finding states (REFUTED/VERIFIED) persist per
 target in `~/.halo/knowledge/`; unchanged findings keep their verdicts,
 changed code re-enters as PROPOSED. Manage with

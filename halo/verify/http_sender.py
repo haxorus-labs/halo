@@ -1,26 +1,35 @@
-"""Shared HTTP transport for authorization-matrix probes.
+"""Outbound HTTP plumbing for the deterministic verification tools.
 
-Two transports share one request/response shape:
+Two callers share this module:
 
-* :class:`HttpxSender` - host-side, ``httpx`` client, sequential sends.
-* ``run_matrix_in_session`` (in :mod:`halo.verify.matrix`) - the same plan
-  replayed inside the sandbox for targets that are only reachable there.
+* a race burst needs many genuinely concurrent requests against one target,
+  which a serialized proxy API cannot provide, so the traffic is sent
+  directly. The host and the sandbox are different network vantage points: a
+  loopback target is only reachable from the host, every other target from the
+  sandbox session where the rest of the scan runs.
+* an authorization matrix sends its probes one at a time and compares the
+  responses. Probe order is part of the evidence, so parallel sends would race
+  on rate limits and session state.
 
-Every network wait is bounded. A probe can stall in four places - connecting,
-sending, waiting for the response head, and reading the body - so the timeout
-is set per phase rather than as one blanket number, and ``send_sequential``
-enforces a wall-clock budget on the whole plan. A matrix that cannot finish
-inside that budget yields ``inconclusive`` cells with the reason attached; it
-never blocks the scan and it never silently drops a probe.
+Every network wait is bounded. A request can stall while connecting, sending,
+waiting for the response head or reading the body, so timeouts are set per
+phase rather than as one blanket number, and whole sequences get a wall-clock
+budget. Credential header values (``Authorization``, ``Cookie``) never appear
+in evidence, not even when a target echoes them back in a response body.
 
-Sends are sequential by design: the probe order is part of the evidence, and
-parallel sends would race on rate limits, session state and log ordering.
+The race runner script is the same text in both places: the sandbox executes
+it as a file, the host executes it on a worker thread. The request logic
+therefore exists exactly once.
 """
 
 from __future__ import annotations
 
 import asyncio
+import base64
+import ipaddress
+import json
 import logging
+import threading
 import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -30,7 +39,7 @@ import httpx
 
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
 
 
 logger = logging.getLogger(__name__)
@@ -59,6 +68,20 @@ MAX_WALL_CLOCK_S = 600.0
 BUDGET_EXHAUSTED_ERROR = "matrix wall-clock budget exhausted before the probe ran"
 
 _HTTP_SCHEMES = frozenset({"http", "https"})
+
+#: Header names whose values are credentials and must never reach evidence.
+SENSITIVE_HEADERS = frozenset({"authorization", "proxy-authorization", "cookie"})
+
+REDACTED = "[REDACTED]"
+
+MODE_LOCAL = "local"
+MODE_SANDBOX = "sandbox"
+
+# The runner is written inside the sandbox container, so the path is a Linux
+# one regardless of where the command is assembled. The file is written and
+# consumed by the same command, so it never outlives the burst.
+_RUNNER_PATH = "/tmp/halo_race_runner.py"  # noqa: S108  # nosec B108 - sandbox scratch file
+_PAYLOAD_PATH = "/tmp/halo_race_payload.json"  # noqa: S108  # nosec B108 - sandbox scratch file
 
 
 @dataclass(frozen=True)
@@ -223,3 +246,199 @@ async def send_sequential(
                 HttpResponse(error=f"request timed out after {min(remaining, per_request):.1f}s")
             )
     return responses
+
+
+def sensitive_header_values(headers: Mapping[str, str]) -> list[str]:
+    """Collect the credential values carried by ``headers``."""
+    return [
+        value
+        for name, value in headers.items()
+        if name.strip().lower() in SENSITIVE_HEADERS and value
+    ]
+
+
+def redact_headers(headers: Mapping[str, str]) -> dict[str, str]:
+    """Copy ``headers`` with every credential value replaced by a marker."""
+    return {
+        name: REDACTED if name.strip().lower() in SENSITIVE_HEADERS else value
+        for name, value in headers.items()
+    }
+
+
+def redact_text(text: str, secrets: Sequence[str] = ()) -> str:
+    """Replace every known credential value inside ``text``."""
+    if not text:
+        return text
+    for secret in secrets:
+        if secret:
+            text = text.replace(secret, REDACTED)
+    return text
+
+
+def is_loopback_host(host: str) -> bool:
+    """True when ``host`` names the host machine itself."""
+    name = host.strip().lower().rstrip(".")
+    if name in {"localhost", "127.0.0.1", "::1"}:
+        return True
+    if name.endswith(".localhost"):
+        return True
+    try:
+        return ipaddress.ip_address(name).is_loopback
+    except ValueError:
+        return False
+
+
+def select_mode(url: str) -> str:
+    """Pick the execution vantage point for ``url``.
+
+    A loopback target is hit from the host, because the sandbox container's
+    loopback is the container itself rather than the target. Every other
+    target is reached from the sandbox session.
+    """
+    host = urlsplit(url).hostname or ""
+    if is_loopback_host(host):
+        return MODE_LOCAL
+    return MODE_SANDBOX
+
+
+def build_command(
+    script: str,
+    payload: Mapping[str, Any],
+    *,
+    runner_path: str = _RUNNER_PATH,
+    payload_path: str = _PAYLOAD_PATH,
+) -> str:
+    """Build a shell command that runs ``script`` with ``payload`` on stdin.
+
+    Both parts travel base64-encoded inside quoted heredocs, so no quoting
+    rule of the shell can be tripped by a header value or a JSON body.
+    """
+    script_b64 = base64.b64encode(script.encode("utf-8")).decode("ascii")
+    payload_b64 = base64.b64encode(json.dumps(payload, ensure_ascii=False).encode("utf-8")).decode(
+        "ascii"
+    )
+    return (
+        f"base64 -d > {runner_path} <<'HALO_RUNNER_EOF'\n"
+        f"{script_b64}\n"
+        f"HALO_RUNNER_EOF\n"
+        f"base64 -d > {payload_path} <<'HALO_PAYLOAD_EOF'\n"
+        f"{payload_b64}\n"
+        f"HALO_PAYLOAD_EOF\n"
+        f"python3 {runner_path} < {payload_path}"
+    )
+
+
+def _execute_locally(script: str, payload: Mapping[str, Any]) -> dict[str, Any]:
+    """Run the runner script in this process and return its result.
+
+    The script drives its own event loop, so it runs on a dedicated thread and
+    returns its result rather than printing it, so the caller never has to
+    scrape stdout.
+    """
+    namespace: dict[str, Any] = {"__name__": "halo_race_runner", "__file__": "<halo_race_runner>"}
+    exec(compile(script, "<halo_race_runner>", "exec"), namespace)  # noqa: S102  # nosec B102
+    entry = namespace.get("main")
+    if not callable(entry):
+        raise TypeError("runner script does not define a callable main()")
+    result = entry(json.loads(json.dumps(payload, ensure_ascii=False)))
+    if not isinstance(result, dict):
+        raise TypeError("runner script returned a non-mapping result")
+    return result
+
+
+async def run_in_session(
+    session: Any,
+    script: str,
+    payload: Mapping[str, Any],
+    timeout: float,
+) -> tuple[int, str, str]:
+    """Run ``script`` in the sandbox session; return (exit code, stdout, stderr)."""
+    result = await session.exec("sh", "-c", build_command(script, payload), timeout=timeout)
+    stdout = result.stdout
+    stderr = result.stderr
+    out_text = (
+        stdout.decode("utf-8", errors="replace") if isinstance(stdout, bytes) else str(stdout or "")
+    )
+    err_text = (
+        stderr.decode("utf-8", errors="replace") if isinstance(stderr, bytes) else str(stderr or "")
+    )
+    return int(result.exit_code or 0), out_text, err_text
+
+
+async def run_locally(
+    script: str,
+    payload: Mapping[str, Any],
+    timeout: float,
+) -> tuple[int, str, str]:
+    """Run ``script`` with ``payload`` on the host; return (exit code, stdout, stderr).
+
+    The work happens on a daemon thread rather than an executor thread. That
+    distinction matters: ``asyncio.run`` joins the loop's default executor at
+    shutdown with no timeout, so a phase that overran its budget would still
+    pin the process forever. A daemon thread is never joined, so a slow or
+    wedged target can only produce a timed-out phase.
+    """
+    loop = asyncio.get_running_loop()
+    future: asyncio.Future[dict[str, Any]] = loop.create_future()
+
+    def _settle(result: dict[str, Any] | None, error: BaseException | None) -> None:
+        if future.done():  # the caller already timed out and moved on
+            return
+        if error is not None:
+            future.set_exception(error)
+        elif result is not None:
+            future.set_result(result)
+
+    def _deliver(result: dict[str, Any] | None, error: BaseException | None) -> None:
+        """Hand the outcome back to the loop, tolerating a loop that moved on."""
+        if loop.is_closed():
+            return
+        try:
+            loop.call_soon_threadsafe(_settle, result, error)
+        except RuntimeError:  # the loop closed between the check and the call
+            return
+
+    def _target() -> None:
+        try:
+            outcome = _execute_locally(script, payload)
+        except BaseException as exc:  # noqa: BLE001 - forwarded to the awaiting coroutine
+            _deliver(None, exc)
+        else:
+            _deliver(outcome, None)
+
+    threading.Thread(target=_target, name="halo-race-runner", daemon=True).start()
+    try:
+        result = await asyncio.wait_for(future, timeout=timeout)
+    except TimeoutError:
+        raise TimeoutError(f"race phase exceeded its {timeout:.0f}s budget") from None
+    return 0, json.dumps(result, ensure_ascii=False), ""
+
+
+__all__ = [
+    "BUDGET_EXHAUSTED_ERROR",
+    "CONNECT_TIMEOUT_S",
+    "DEFAULT_MAX_RETRIES",
+    "DEFAULT_TIMEOUT_S",
+    "MAX_BODY_CHARS",
+    "MAX_WALL_CLOCK_S",
+    "MODE_LOCAL",
+    "MODE_SANDBOX",
+    "REDACTED",
+    "RETRY_BACKOFF_S",
+    "SENSITIVE_HEADERS",
+    "HttpRequest",
+    "HttpResponse",
+    "HttpSender",
+    "HttpxSender",
+    "build_command",
+    "clamp_timeout",
+    "is_http_url",
+    "is_loopback_host",
+    "redact_headers",
+    "redact_text",
+    "run_in_session",
+    "run_locally",
+    "select_mode",
+    "send_sequential",
+    "sensitive_header_values",
+]

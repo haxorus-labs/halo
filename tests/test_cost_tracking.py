@@ -133,8 +133,15 @@ def test_cost_callback_estimates_cost_with_provider_prefixed_model() -> None:
             return 0.5
         raise ValueError(kwargs["model"])
 
+    # Pin resolution: LiteLLM's cost map drifts between releases, and this test
+    # is about building the candidate from litellm_params.custom_llm_provider,
+    # not about which provider happens to own the entry today.
     with (
         patch("halo.report.state.get_global_report_state", return_value=report_state),
+        patch(
+            "halo.report.state.resolve_litellm_model",
+            return_value="openrouter/anthropic/claude-sonnet-4.5",
+        ),
         patch("litellm.completion_cost", side_effect=fake_completion_cost),
     ):
         litellm_cost_callback(kwargs, response)
@@ -389,3 +396,35 @@ def test_openrouter_request_carries_agent_session_id() -> None:
             assert body()["session_id"] == session_id
     finally:
         request_log.reset_call_context(token)
+
+
+def test_cost_estimate_never_infers_a_provider() -> None:
+    """Estimating cost stays on the cost map; inference can start a login.
+
+    ``completion_cost`` resolves the provider when the caller supplies none,
+    and for some providers that resolution authenticates interactively. The
+    callback therefore has to hand LiteLLM the provider of the entry it
+    already resolved; if it does not, this patched inference raises.
+    """
+    report_state = MagicMock()
+    response = {"usage": {"prompt_tokens": 1000, "completion_tokens": 200, "total_tokens": 1200}}
+
+    with (
+        patch("halo.report.state.get_global_report_state", return_value=report_state),
+        patch("litellm.get_llm_provider", side_effect=AssertionError("provider inferred")),
+    ):
+        litellm_cost_callback({"model": "openai/gpt-4o-mini"}, response)
+
+    report_state.record_observed_llm_cost.assert_called_once()
+    assert report_state.record_observed_llm_cost.call_args.args[0] > 0
+
+
+def test_cost_estimate_never_prices_a_provider_that_needs_a_login() -> None:
+    """The Copilot vector resolves to no local price, so nothing is recorded."""
+    report_state = MagicMock()
+    response = {"usage": {"prompt_tokens": 1000, "completion_tokens": 200, "total_tokens": 1200}}
+
+    with patch("halo.report.state.get_global_report_state", return_value=report_state):
+        litellm_cost_callback({"model": "github_copilot/claude-sonnet-4.6"}, response)
+
+    report_state.record_observed_llm_cost.assert_not_called()

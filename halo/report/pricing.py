@@ -31,6 +31,18 @@ def needs_interactive_auth(model: str) -> bool:
     return _provider_of(model) in INTERACTIVE_AUTH_PROVIDERS
 
 
+def cost_map_provider(model: str) -> str | None:
+    """Provider segment of a resolved cost-map key, when it has one.
+
+    ``litellm.completion_cost`` infers a provider with ``get_llm_provider``
+    when the caller supplies none. Resolution is already restricted to local
+    entries that never authenticate interactively, but passing the provider
+    keeps the estimate on exactly the entry that was resolved instead of
+    letting LiteLLM derive a possibly different one.
+    """
+    return _provider_of(model) or None
+
+
 @lru_cache(maxsize=512)
 def resolve_litellm_model(model: str) -> str | None:
     """Return a provider-qualified model name that LiteLLM can price.

@@ -43,6 +43,7 @@ dependencies = [
   "rich",
   "docker>=7.1.0",
   "requests>=2.32.0",
+  "httpx>=0.28.0",
   "cvss>=3.2",
   "caido-sdk-client>=0.2.0",
   "markdown-it-py>=3.0.0",
@@ -68,11 +69,17 @@ dev = [
   "pyinstaller>=6.17.0; python_version >= '3.12' and python_version < '3.15'",
   "pytest>=8.3",
   "pytest-asyncio>=0.24",
+  "pytest-timeout>=2.3",
   "types-requests>=2.32",
 ]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+# A wedged test has to fail in a minute instead of burning the six-hour job
+# limit. "thread" is the only method available on Windows, so it is used
+# everywhere to make local and CI runs behave the same.
+timeout = 60
+timeout_method = "thread"
 
 [build-system]
 requires = ["hatchling"]

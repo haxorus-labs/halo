@@ -36,6 +36,16 @@ hand-rolling this playbook:
    all runs satisfy it. Use `reset_sandbox(commands=[...])` first when the
    PoC mutates target state (defaults to the fixture's reset commands when
    defined; reports honestly when none exist).
+8. Race conditions: `race_burst(request_id=...|"raw_request=..., burst_size=8,
+   baseline_runs=8, reset_request=..., probe_request=...)` fires the same
+   request once at a time (the baseline) and then all at once (the burst).
+   When the burst wins clearly more requests than the baseline did, the
+   target protected a read-modify-write window it does not control — verdict
+   RACE_CONFIRMED only when a durability probe shows the duplicated effect
+   persisted, RACE_SUSPECTED otherwise, NOT_A_RACE when the baseline already
+   won everything. Pass `reset_request` so both phases start from the same
+   state, and `probe_request` to read the state back afterwards. Burst
+   targets are limited to this scan's declared targets and local hosts.
 
 Only fall back to the manual commands below when you need raw artifacts.
 

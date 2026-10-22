@@ -206,3 +206,36 @@ def test_cost_estimate_never_reaches_an_interactive_login(monkeypatch: pytest.Mo
     # A bare-name fallback may still be priced locally, but the provider that
     # opens a device-code login must never be handed to ``completion_cost``.
     assert not [model for model in priced if model.startswith("github_copilot/")]
+
+
+def test_ledger_estimate_never_infers_a_provider() -> None:
+    """The usage-ledger estimate is local too: no provider discovery/login."""
+    usage = Usage()
+    usage.requests = 1
+    usage.input_tokens = 1000
+    usage.output_tokens = 200
+    usage.total_tokens = 1200
+    ledger = LLMUsageLedger()
+
+    with patch("litellm.get_llm_provider", side_effect=AssertionError("provider inferred")):
+        ledger.record(
+            agent_id="a",
+            usage=usage,
+            model="openai/gpt-4o-mini",
+        )
+
+    assert ledger.total_cost > 0
+
+
+def test_ledger_never_prices_a_provider_that_needs_a_login() -> None:
+    """A device-code provider has no local price, so the ledger stays at zero."""
+    usage = Usage()
+    usage.requests = 1
+    usage.input_tokens = 1000
+    usage.output_tokens = 200
+    usage.total_tokens = 1200
+    ledger = LLMUsageLedger()
+
+    ledger.record(agent_id="a", usage=usage, model="github_copilot/claude-sonnet-4.6")
+
+    assert ledger.total_cost == 0
