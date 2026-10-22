@@ -172,10 +172,48 @@ def test_resolver_keeps_a_known_provider_entry_and_never_borrows_a_sibling() -> 
             == "openrouter/anthropic/claude-sonnet-4.6"
         )
         # Without an openrouter entry, the same-suffix copilot entry must not
-        # be borrowed, even though LiteLLM prices it identically.
+        # be borrowed, even though LiteLLM prices it identically: the name
+        # stays in the family the caller named.
         del litellm.model_cost["openrouter/anthropic/claude-sonnet-4.6"]
         resolve_litellm_model.cache_clear()
-        assert resolve_litellm_model("openrouter/anthropic/claude-sonnet-4.6") is None
+        assert (
+            resolve_litellm_model("openrouter/anthropic/claude-sonnet-4.6")
+            == "openrouter/anthropic/claude-sonnet-4.6"
+        )
+    finally:
+        litellm.model_cost = original
+        resolve_litellm_model.cache_clear()
+
+
+def test_resolver_hands_back_a_qualified_name_it_cannot_price_locally() -> None:
+    """A routed call names its provider; estimation keeps that name.
+
+    LiteLLM prices models the bundled map does not carry, so the provider the
+    caller named is passed through unchanged (it can only raise inside
+    ``completion_cost``, which callers handle). What it must never do is swap
+    in a different provider's entry.
+    """
+    resolve_litellm_model.cache_clear()
+    assert (
+        resolve_litellm_model("openrouter/anthropic/claude-sonnet-4.5")
+        == "openrouter/anthropic/claude-sonnet-4.5"
+    )
+
+
+def test_resolver_refuses_a_priced_entry_that_needs_interactive_auth() -> None:
+    """A copilot entry in the map does not make the name safe to price."""
+    original = litellm.model_cost
+    litellm.model_cost = {
+        "github_copilot/claude-sonnet-4.6": {
+            "input_cost_per_token": 3e-06,
+            "output_cost_per_token": 1.5e-05,
+        },
+    }
+    try:
+        resolve_litellm_model.cache_clear()
+        assert resolve_litellm_model("github_copilot/claude-sonnet-4.6") is None
+        # Nor may a bare name be widened to it.
+        assert resolve_litellm_model("claude-sonnet-4.6") is None
     finally:
         litellm.model_cost = original
         resolve_litellm_model.cache_clear()

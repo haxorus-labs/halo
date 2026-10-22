@@ -36,7 +36,10 @@ def resolve_litellm_model(model: str) -> str | None:
     """Return a provider-qualified model name that LiteLLM can price.
 
     ``None`` means "no local price is known"; callers then fall back to the
-    provider-reported cost instead of guessing.
+    provider-reported cost instead of guessing. A name the caller already
+    qualified with a known provider is returned unchanged (unless that
+    provider authenticates interactively), and bare names are widened to a
+    provider only when the price is unambiguous within one provider family.
     """
     try:
         import litellm
@@ -58,8 +61,6 @@ def resolve_litellm_model(model: str) -> str | None:
             provider = bare_entry.get("litellm_provider")
             if isinstance(provider, str) and provider and not needs_interactive_auth(provider):
                 return f"{provider}/{normalized}"
-        if "/" in normalized and isinstance(bare_entry, dict):
-            return None if needs_interactive_auth(normalized) else normalized
 
         # A suffix match may only stay inside the provider the caller named.
         # Matching across providers is how ``openrouter/anthropic/claude-...``
@@ -70,12 +71,18 @@ def resolve_litellm_model(model: str) -> str | None:
             for entry in getattr(litellm, "provider_list", ())
         }
         family = _provider_of(normalized)
-        if (
-            family
-            and family not in providers
-            and not any(str(key).startswith(f"{family}/") for key in model_cost)
-        ):
-            family = ""
+        family_known = bool(family) and (
+            family in providers or any(str(key).startswith(f"{family}/") for key in model_cost)
+        )
+        if family_known:
+            # The caller named the provider itself, so the name cannot drift
+            # into another vendor's entry. Hand it over unchanged: LiteLLM may
+            # still know a price the local map does not carry, and a name it
+            # cannot price only raises inside ``completion_cost``, which every
+            # caller already handles. Providers that authenticate are the one
+            # exception, because pricing them is what used to open a login.
+            return None if needs_interactive_auth(normalized) else normalized
+        family = ""
 
         names = [normalized]
         if "/" in normalized:
