@@ -306,6 +306,14 @@ async def run_halo_scan(
     hydrate_sast_from_disk(state_dir)
     hydrate_kg_from_disk(state_dir)
 
+    # The auth matrix probes live HTTP targets, so it is registered for every
+    # scan (not only white-box runs). Registered here, before any agent is
+    # built, so root and child agents both get it.
+    from halo.agents.factory import register_agent_tools as _register_agent_tools
+    from halo.tools.verify.auth_matrix import auth_matrix as _auth_matrix
+
+    _register_agent_tools(_auth_matrix)
+
     root_id: str | None = None
     if is_resume:
         try:

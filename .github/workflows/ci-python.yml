@@ -47,6 +47,9 @@ jobs:
   pytest:
     name: pytest (${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    # The suite finishes in minutes; a job that outlives this is hung, not
+    # slow. Without it a stuck probe can burn the runner for hours.
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
