@@ -6,6 +6,35 @@ from functools import lru_cache
 from typing import Any, cast
 
 
+def cost_map_provider(model: str) -> str | None:
+    """Return the provider segment that keeps ``model`` on its cost-map entry.
+
+    ``litellm.completion_cost`` infers a provider with ``get_llm_provider`` when
+    the caller supplies none, and that inference can pick a provider which
+    authenticates while resolving its config: ``claude-sonnet-4.6`` is priced
+    only under ``github_copilot/``, and resolving that provider starts a GitHub
+    device login and polls it with ``time.sleep``. A cost estimate is a local
+    read of the cost map, so the provider is handed to LiteLLM explicitly
+    instead of being inferred.
+    """
+    if "/" in model:
+        return model.split("/", 1)[0]
+    try:
+        import litellm
+
+        entry = cast(
+            "dict[str, dict[str, Any]]",
+            getattr(litellm, "model_cost"),  # noqa: B009
+        ).get(model)
+    except Exception:  # noqa: BLE001
+        return None
+    if isinstance(entry, dict):
+        provider = entry.get("litellm_provider")
+        if isinstance(provider, str) and provider:
+            return provider
+    return None
+
+
 @lru_cache(maxsize=512)
 def resolve_litellm_model(model: str) -> str | None:
     """Return a provider-qualified model name that LiteLLM can price."""

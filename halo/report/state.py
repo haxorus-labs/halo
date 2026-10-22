@@ -14,7 +14,7 @@ from halo.config import codex
 from halo.config.loader import load_settings
 from halo.core.paths import run_dir_for, runtime_state_dir
 from halo.report.coverage import write_coverage
-from halo.report.pricing import resolve_litellm_model
+from halo.report.pricing import cost_map_provider, resolve_litellm_model
 from halo.report.sarif import write_sarif
 from halo.report.writer import (
     read_run_record,
@@ -1172,6 +1172,10 @@ def _estimate_response_cost(kwargs: Any, completion_response: Any) -> float | No
             value = completion_cost(
                 completion_response={"model": resolved, "usage": usage_payload},
                 model=resolved,
+                # Supplying the provider keeps the estimate on the cost map.
+                # Without it LiteLLM infers one, and that inference can start a
+                # real provider login (github_copilot) and poll it forever.
+                custom_llm_provider=cost_map_provider(resolved),
             )
         except Exception:  # nosec B112  # noqa: BLE001, S112
             continue

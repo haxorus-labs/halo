@@ -127,3 +127,22 @@ def test_resolver_does_not_guess_between_differently_priced_providers() -> None:
     finally:
         litellm.model_cost = original
         resolve_litellm_model.cache_clear()
+
+
+def test_ledger_estimate_never_infers_a_provider() -> None:
+    """The usage-ledger estimate is local too: no provider discovery/login."""
+    usage = Usage()
+    usage.requests = 1
+    usage.input_tokens = 1000
+    usage.output_tokens = 200
+    usage.total_tokens = 1200
+    ledger = LLMUsageLedger()
+
+    with patch("litellm.get_llm_provider", side_effect=AssertionError("provider inferred")):
+        ledger.record(
+            agent_id="a",
+            usage=usage,
+            model="openrouter/anthropic/claude-sonnet-4.6",
+        )
+
+    assert ledger.total_cost > 0
