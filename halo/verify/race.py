@@ -59,6 +59,10 @@ MIN_THRESHOLD = 2
 BODY_EXCERPT_CHARS = 500
 #: Characters of the durability probe response read while looking for markers.
 PROBE_BODY_CHARS = 20000
+#: Upper bound on a single request inside a phase. A race window is short; a
+#: request that has not answered by then is a failed measurement, never a wait
+#: that outlives the phase.
+MAX_REQUEST_TIMEOUT_SECONDS = 30.0
 
 VERDICT_RACE_CONFIRMED = "RACE_CONFIRMED"
 VERDICT_RACE_SUSPECTED = "RACE_SUSPECTED"
@@ -92,6 +96,7 @@ import time
 import httpx
 
 DEFAULT_BODY_LIMIT = 2000
+DEFAULT_REQUEST_TIMEOUT = 30.0
 SLOT_RE = re.compile(r"\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}")
 
 
@@ -103,7 +108,7 @@ def _fill(template, index):
     )
 
 
-def _build_client(connections):
+def _build_client(connections, request_timeout):
     # The burst deliberately bypasses the ambient proxy configuration: the
     # proxy serializes requests, and a burst has to leave as one wave.
     kwargs = {"trust_env": False}
@@ -113,6 +118,9 @@ def _build_client(connections):
     kwargs["limits"] = httpx.Limits(
         max_connections=connections, max_keepalive_connections=connections
     )
+    # Every phase of a request is bounded, including the wait for a pooled
+    # connection, so no single request can hold the phase open forever.
+    kwargs["timeout"] = httpx.Timeout(request_timeout)
     return httpx.AsyncClient(**kwargs)
 
 
@@ -143,30 +151,69 @@ async def _one(client, spec, index, body_limit):
     }
 
 
+async def _concurrent(client, spec, count, body_limit):
+    """Fire every request as one wave: all workers ready, then one release.
+
+    A shared gate is what makes the measurement a burst instead of a ramp.
+    The workers park on the gate, the coordinator waits until every one of
+    them has parked, and then releases them all in the same event-loop turn.
+    """
+    gate = asyncio.Event()
+    ready = asyncio.Event()
+    parked = 0
+
+    async def worker(index):
+        nonlocal parked
+        parked += 1
+        if parked >= count:
+            ready.set()
+        await gate.wait()
+        return await _one(client, spec, index, body_limit)
+
+    tasks = [asyncio.create_task(worker(index)) for index in range(count)]
+    try:
+        try:
+            # The workers only await the gate, so this is near-instant; the
+            # bound exists so a wedged worker can never keep the phase waiting.
+            await asyncio.wait_for(ready.wait(), timeout=1.0)
+        except asyncio.TimeoutError:
+            pass
+        gate.set()
+        return list(await asyncio.gather(*tasks))
+    finally:
+        gate.set()
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+
+async def _fire(client, spec, mode, count, body_limit):
+    if mode == "concurrent":
+        return await _concurrent(client, spec, count, body_limit)
+    records = []
+    for index in range(count):
+        records.append(await _one(client, spec, index, body_limit))
+    return records
+
+
 async def _run(payload):
     spec = payload["request"]
     mode = payload.get("mode", "sequential")
     count = int(payload.get("count", 1))
     body_limit = int(payload.get("body_limit") or DEFAULT_BODY_LIMIT)
+    request_timeout = float(payload.get("request_timeout") or DEFAULT_REQUEST_TIMEOUT)
+    overall_timeout = float(payload.get("overall_timeout") or request_timeout * max(count, 1))
     try:
-        async with _build_client(max(count, 8)) as client:
-            if mode == "concurrent":
-                gate = asyncio.Event()
-
-                async def worker(index):
-                    await gate.wait()
-                    return await _one(client, spec, index, body_limit)
-
-                tasks = [asyncio.create_task(worker(index)) for index in range(count)]
-                # Give every worker the chance to park on the gate so the burst
-                # really leaves as one wave instead of a ramp.
-                await asyncio.sleep(0.05)
-                gate.set()
-                records = list(await asyncio.gather(*tasks))
-            else:
-                records = []
-                for index in range(count):
-                    records.append(await _one(client, spec, index, body_limit))
+        async with _build_client(max(count, 8), request_timeout) as client:
+            records = await asyncio.wait_for(
+                _fire(client, spec, mode, count, body_limit), timeout=overall_timeout
+            )
+    except asyncio.TimeoutError:
+        return {
+            "error": "phase exceeded its %.0fs budget" % overall_timeout,
+            "records": [],
+        }
     except Exception as exc:
         return {"error": "%s: %s" % (type(exc).__name__, exc), "records": []}
     return {"error": None, "records": records}
@@ -385,6 +432,11 @@ async def _run_phase(
         "mode": mode,
         "count": count,
         "body_limit": body_limit,
+        # Both bounds travel with the payload: the runner enforces them itself,
+        # so a wedged socket or a stalled pool wait ends as a failed phase
+        # instead of an unbounded wait in the caller.
+        "request_timeout": min(float(timeout), MAX_REQUEST_TIMEOUT_SECONDS),
+        "overall_timeout": float(timeout),
     }
     try:
         if http_sender.select_mode(spec.url) == http_sender.MODE_SANDBOX:
@@ -547,6 +599,7 @@ __all__ = [
     "DURABILITY_PASSED",
     "DURABILITY_SKIPPED",
     "INDEX_SLOT",
+    "MAX_REQUEST_TIMEOUT_SECONDS",
     "MIN_THRESHOLD",
     "MODE_CONCURRENT",
     "MODE_SEQUENTIAL",

@@ -24,6 +24,7 @@ import asyncio
 import base64
 import ipaddress
 import json
+import threading
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit
 
@@ -130,9 +131,9 @@ def build_command(
 def _execute_locally(script: str, payload: Mapping[str, Any]) -> dict[str, Any]:
     """Run the runner script in this process and return its result.
 
-    The script is executed in a worker thread because it drives its own
-    event loop, and it returns its result rather than printing it, so the
-    caller never has to scrape stdout.
+    The script drives its own event loop, so it runs on a dedicated thread and
+    returns its result rather than printing it, so the caller never has to
+    scrape stdout.
     """
     namespace: dict[str, Any] = {"__name__": "halo_race_runner", "__file__": "<halo_race_runner>"}
     exec(compile(script, "<halo_race_runner>", "exec"), namespace)  # noqa: S102  # nosec B102
@@ -169,11 +170,47 @@ async def run_locally(
     payload: Mapping[str, Any],
     timeout: float,
 ) -> tuple[int, str, str]:
-    """Run ``script`` with ``payload`` on the host; return (exit code, stdout, stderr)."""
-    result = await asyncio.wait_for(
-        asyncio.to_thread(_execute_locally, script, payload),
-        timeout=timeout,
-    )
+    """Run ``script`` with ``payload`` on the host; return (exit code, stdout, stderr).
+
+    The work happens on a daemon thread rather than an executor thread. That
+    distinction matters: ``asyncio.run`` joins the loop's default executor at
+    shutdown with no timeout, so a phase that overran its budget would still
+    pin the process forever. A daemon thread is never joined, so a slow or
+    wedged target can only produce a timed-out phase.
+    """
+    loop = asyncio.get_running_loop()
+    future: asyncio.Future[dict[str, Any]] = loop.create_future()
+
+    def _settle(result: dict[str, Any] | None, error: BaseException | None) -> None:
+        if future.done():  # the caller already timed out and moved on
+            return
+        if error is not None:
+            future.set_exception(error)
+        elif result is not None:
+            future.set_result(result)
+
+    def _deliver(result: dict[str, Any] | None, error: BaseException | None) -> None:
+        """Hand the outcome back to the loop, tolerating a loop that moved on."""
+        if loop.is_closed():
+            return
+        try:
+            loop.call_soon_threadsafe(_settle, result, error)
+        except RuntimeError:  # the loop closed between the check and the call
+            return
+
+    def _target() -> None:
+        try:
+            outcome = _execute_locally(script, payload)
+        except BaseException as exc:  # noqa: BLE001 - forwarded to the awaiting coroutine
+            _deliver(None, exc)
+        else:
+            _deliver(outcome, None)
+
+    threading.Thread(target=_target, name="halo-race-runner", daemon=True).start()
+    try:
+        result = await asyncio.wait_for(future, timeout=timeout)
+    except TimeoutError:
+        raise TimeoutError(f"race phase exceeded its {timeout:.0f}s budget") from None
     return 0, json.dumps(result, ensure_ascii=False), ""
 
 
