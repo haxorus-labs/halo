@@ -15,6 +15,17 @@ Differential rules enforced here:
 * **method asymmetry** - a state-changing method is allowed where the read
   method on the same path is denied.
 
+Every rule is differential across *content*, not just status: the three access
+rules require a baseline observation (the owner for horizontal, an authorized
+role for vertical, an authenticated caller for anonymous) and compare the
+probe's body against it. Identical content is the strongest evidence, an equal
+JSON structure with different values is weaker but still evidence, and a body
+that differs outright means the probe was served *something else* - a login
+page rather than the object - so the candidate is withheld and recorded in
+``withheld`` with the reason. When no baseline was observed the comparison is
+``unknown`` and the rule still fires, with the missing baseline named in the
+counterevidence.
+
 Candidates are advisory. Every candidate carries the evidence that produced
 it *and* the counterevidence that could explain it away, so a reviewer can
 judge instead of trusting the tool.
@@ -30,14 +41,21 @@ confused with absence of a probe.
 
 from __future__ import annotations
 
+import hashlib
 import io
 import json
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from halo.verify.http_sender import HttpRequest, HttpResponse
+from halo.verify.http_sender import (
+    DEFAULT_TIMEOUT_S,
+    HttpRequest,
+    HttpResponse,
+    clamp_timeout,
+)
 
 
 if TYPE_CHECKING:
@@ -47,6 +65,14 @@ if TYPE_CHECKING:
 IMPLICIT_ANON_ID = "anon"
 BODY_SAMPLE_CHARS = 300
 MAX_MATRIX_CELLS = 200
+
+#: Ceiling on the sandbox runner process, whatever the plan size.
+MAX_SANDBOX_EXEC_S = 600.0
+
+#: Bound on the structural walk, so an adversarial body cannot turn the
+#: fingerprint into an expensive traversal.
+MAX_STRUCTURE_NODES = 200
+MAX_STRUCTURE_DEPTH = 12
 
 #: The answer carried content: the caller reached the object.
 ALLOWED = "allowed"
@@ -79,6 +105,17 @@ ROLE_RANK: dict[str, int] = {
 
 #: Payloads that carry no object data.
 EMPTY_PAYLOADS = frozenset({"", "{}", "[]", "null"})
+
+#: How a probe's body relates to the baseline it is compared against.
+CONTENT_IDENTICAL = "identical"
+CONTENT_SAME_STRUCTURE = "same_structure"
+CONTENT_DIFFERENT = "different"
+CONTENT_UNKNOWN = "unknown"
+
+#: Content comparisons that support an access differential. ``DIFFERENT``
+#: means the probe was served a different document, so it cannot show that
+#: the probe reached the baseline's object.
+SUPPORTING_CONTENT = frozenset({CONTENT_IDENTICAL, CONTENT_SAME_STRUCTURE})
 
 
 @dataclass(frozen=True)
@@ -120,6 +157,22 @@ class MatrixCell:
     body_len: int = 0
     body_sample: str = ""
     error: str | None = None
+    #: Digest of the whole observed body, truncated for the response. Two
+    #: probes that got the same document share it.
+    content_digest: str = ""
+    #: Canonical JSON shape of the body (``path:type`` lines), or ``""`` when
+    #: the body is not JSON and therefore has no comparable structure.
+    content_shape: str = ""
+
+
+@dataclass(frozen=True)
+class WithheldCandidate:
+    """A rule that matched on status but was rejected by the content diff."""
+
+    rule: str
+    operation_id: str
+    persona_id: str
+    reason: str
 
 
 @dataclass(frozen=True)
@@ -159,6 +212,113 @@ def evidence_verdict(verdict: str) -> str | None:
     as either an allow or a deny would manufacture findings.
     """
     return verdict if verdict in EVIDENCE_VERDICTS else None
+
+
+_WHITESPACE = re.compile(r"\s+")
+
+
+def _canonical_text(text: str) -> str:
+    """A value-level canonical form of ``text``.
+
+    JSON is re-serialized with sorted keys and no insignificant whitespace, so
+    key order and pretty-printing cannot make the same document look different.
+    Anything else is whitespace-folded text.
+    """
+    if text[:1] in "{[":
+        try:
+            return json.dumps(
+                json.loads(text),
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+            )
+        except (ValueError, RecursionError):
+            pass
+    return _WHITESPACE.sub(" ", text).strip()
+
+
+def body_digest(body: str) -> str:
+    """A stable fingerprint of ``body`` with insignificant whitespace folded.
+
+    Whitespace outside a string literal is meaningless to a JSON client, so
+    two probes that received the same document must not differ only because
+    one was pretty-printed. A blank body has no digest.
+    """
+    canonical = _canonical_text((body or "").strip())
+    if not canonical:
+        return ""
+    return hashlib.sha256(canonical.encode("utf-8", "replace")).hexdigest()[:16]
+
+
+def _shape_of(value: Any, prefix: str, depth: int, out: set[str]) -> None:
+    """Collect ``path:type`` lines for a decoded JSON value."""
+    if len(out) >= MAX_STRUCTURE_NODES or depth > MAX_STRUCTURE_DEPTH:
+        return
+    if isinstance(value, dict):
+        if not value:
+            out.add(f"{prefix}:object")
+        for key in sorted(value, key=str):
+            _shape_of(value[key], f"{prefix}.{key}" if prefix else str(key), depth + 1, out)
+        return
+    if isinstance(value, list):
+        if not value:
+            out.add(f"{prefix}:array")
+        for item in value:
+            _shape_of(item, f"{prefix}[]", depth + 1, out)
+        return
+    if isinstance(value, bool):
+        kind = "bool"
+    elif isinstance(value, (int, float)):
+        kind = "number"
+    elif value is None:
+        kind = "null"
+    else:
+        kind = "string"
+    out.add(f"{prefix}:{kind}" if prefix else kind)
+
+
+def body_shape(body: str) -> str:
+    """A canonical description of a JSON body's structure, or ``""``.
+
+    The shape ignores values on purpose: a per-viewer field (a name, a
+    timestamp) must not hide that two callers received the same document
+    layout. Non-JSON bodies return ``""`` because text has no structure worth
+    comparing - only its digest is meaningful.
+    """
+    text = (body or "").strip()
+    if not text or text[0] not in "{[":
+        return ""
+    try:
+        value = json.loads(text)
+    except (ValueError, RecursionError):
+        return ""
+    out: set[str] = set()
+    _shape_of(value, "", 0, out)
+    return "\n".join(sorted(out))
+
+
+def compare_content(observed: MatrixCell | None, baseline: MatrixCell | None) -> str:
+    """How ``observed``'s body relates to ``baseline``'s body."""
+    if observed is None or baseline is None:
+        return CONTENT_UNKNOWN
+    if not observed.content_digest or not baseline.content_digest:
+        return CONTENT_UNKNOWN
+    if observed.content_digest == baseline.content_digest:
+        return CONTENT_IDENTICAL
+    if observed.content_shape and observed.content_shape == baseline.content_shape:
+        return CONTENT_SAME_STRUCTURE
+    return CONTENT_DIFFERENT
+
+
+def _content_sentence(subject: str, match: str, baseline: str) -> str:
+    """Render one content-comparison line for a candidate's evidence."""
+    if match == CONTENT_IDENTICAL:
+        return f"{subject} body is identical to {baseline}"
+    if match == CONTENT_SAME_STRUCTURE:
+        return f"{subject} body has the same structure as {baseline} but different values"
+    if match == CONTENT_DIFFERENT:
+        return f"{subject} body differs from {baseline}"
+    return f"{subject} body could not be compared with {baseline} (no baseline body)"
 
 
 def verdict_for_cell(cell: MatrixCell) -> str:
@@ -296,6 +456,8 @@ def cells_from_responses(
                 body_len=len(body),
                 body_sample=body[:BODY_SAMPLE_CHARS],
                 error=response.error,
+                content_digest=body_digest(body),
+                content_shape=body_shape(body),
             )
         )
     return cells
@@ -309,12 +471,17 @@ def _describe(cell: MatrixCell | None) -> str:
     return f"HTTP {cell.status} ({cell.body_len} bytes)"
 
 
-def compute_candidates(
+def compute_differentials(
     operations: Sequence[MatrixOperation],
     personas: Sequence[MatrixPersona],
     cells: Sequence[MatrixCell],
-) -> list[MatrixCandidate]:
-    """Apply the differential rules and return advisory candidates."""
+) -> tuple[list[MatrixCandidate], list[WithheldCandidate]]:
+    """Apply the differential rules.
+
+    Returns the advisory candidates plus the status-only matches that the
+    content comparison rejected, so a withheld differential stays visible
+    instead of looking like a probe that never fired.
+    """
     cell_index = {(cell.operation_id, cell.persona_id): cell for cell in cells}
     # Only unambiguous verdicts may act as evidence; EMPTY and REDIRECT are
     # filtered out here so no rule can accidentally treat them as access.
@@ -323,11 +490,45 @@ def compute_candidates(
     }
 
     candidates: list[MatrixCandidate] = []
-    candidates.extend(_anonymous_access_candidates(operations, personas, cell_index, verdicts))
-    candidates.extend(_horizontal_idor_candidates(operations, personas, cell_index, verdicts))
-    candidates.extend(_vertical_escalation_candidates(operations, personas, cell_index, verdicts))
-    candidates.extend(_method_asymmetry_candidates(operations, personas, cell_index, verdicts))
+    withheld: list[WithheldCandidate] = []
+    for rule in (
+        _anonymous_access_candidates,
+        _horizontal_idor_candidates,
+        _vertical_escalation_candidates,
+        _method_asymmetry_candidates,
+    ):
+        found, rejected = rule(operations, personas, cell_index, verdicts)
+        candidates.extend(found)
+        withheld.extend(rejected)
+    return candidates, withheld
+
+
+def compute_candidates(
+    operations: Sequence[MatrixOperation],
+    personas: Sequence[MatrixPersona],
+    cells: Sequence[MatrixCell],
+) -> list[MatrixCandidate]:
+    """Apply the differential rules and return advisory candidates."""
+    candidates, _withheld = compute_differentials(operations, personas, cells)
     return candidates
+
+
+def _authorized_baseline(
+    operation: MatrixOperation,
+    personas: Sequence[MatrixPersona],
+    cell_index: Mapping[tuple[str, str], MatrixCell],
+    verdicts: Mapping[tuple[str, str], str],
+    *,
+    exclude: str,
+    predicate: Any,
+) -> tuple[MatrixPersona | None, MatrixCell | None]:
+    """The first allowed caller matching ``predicate``, and its cell."""
+    for persona in personas:
+        if persona.id == exclude or not predicate(persona):
+            continue
+        if verdicts.get((operation.id, persona.id)) == ALLOWED:
+            return persona, cell_index.get((operation.id, persona.id))
+    return None, None
 
 
 def _anonymous_access_candidates(
@@ -335,8 +536,9 @@ def _anonymous_access_candidates(
     personas: Sequence[MatrixPersona],
     cell_index: Mapping[tuple[str, str], MatrixCell],
     verdicts: Mapping[tuple[str, str], str],
-) -> list[MatrixCandidate]:
+) -> tuple[list[MatrixCandidate], list[WithheldCandidate]]:
     candidates: list[MatrixCandidate] = []
+    withheld: list[WithheldCandidate] = []
     anon_ids = [persona.id for persona in personas if persona.is_anon]
     for operation in operations:
         if operation.public:
@@ -360,9 +562,42 @@ def _anonymous_access_candidates(
                     )
         if not evidence or not protected:
             continue
+
+        anon_cell = cell_index.get((operation.id, IMPLICIT_ANON_ID))
+        baseline_persona, baseline_cell = _authorized_baseline(
+            operation,
+            personas,
+            cell_index,
+            verdicts,
+            exclude=IMPLICIT_ANON_ID,
+            predicate=lambda persona: not persona.is_anon,
+        )
+        match = compare_content(anon_cell, baseline_cell)
+        if match == CONTENT_DIFFERENT:
+            withheld.append(
+                WithheldCandidate(
+                    rule="anonymous_access",
+                    operation_id=operation.id,
+                    persona_id=IMPLICIT_ANON_ID,
+                    reason=(
+                        "the anonymous body differs from the authenticated caller's "
+                        "document, so it is not evidence of exposure (a 200 login or "
+                        "error page looks like this)"
+                    ),
+                )
+            )
+            continue
+
         counterevidence = [
             "the operation may be intentionally public; mark it public to suppress this rule",
         ]
+        if baseline_persona is not None:
+            evidence.append(_content_sentence("anonymous", match, f"{baseline_persona.id}'s view"))
+        else:
+            counterevidence.append(
+                "no authenticated caller was observed to be allowed, so this rests on "
+                "status alone; confirm a protected caller can read the same document"
+            )
         if not peer_denied:
             counterevidence.append(
                 "no authenticated peer was observed to be denied, so the endpoint may "
@@ -379,10 +614,15 @@ def _anonymous_access_candidates(
                 ),
                 evidence=tuple(evidence),
                 counterevidence=tuple(counterevidence),
-                details={"method": operation.method, "path": operation.path},
+                details={
+                    "method": operation.method,
+                    "path": operation.path,
+                    "content_match": match,
+                    "baseline_persona": baseline_persona.id if baseline_persona else None,
+                },
             )
         )
-    return candidates
+    return candidates, withheld
 
 
 def _horizontal_idor_candidates(
@@ -390,8 +630,9 @@ def _horizontal_idor_candidates(
     personas: Sequence[MatrixPersona],
     cell_index: Mapping[tuple[str, str], MatrixCell],
     verdicts: Mapping[tuple[str, str], str],
-) -> list[MatrixCandidate]:
+) -> tuple[list[MatrixCandidate], list[WithheldCandidate]]:
     candidates: list[MatrixCandidate] = []
+    withheld: list[WithheldCandidate] = []
     for operation in operations:
         if not operation.owner or operation.shared:
             continue
@@ -401,18 +642,43 @@ def _horizontal_idor_candidates(
         for persona in personas:
             if persona.is_anon or persona.id == owner.id:
                 continue
+            # Same role, different principal: the owner's object read by a peer.
             if persona.role != owner.role:
                 continue
             if verdicts.get((operation.id, persona.id)) != ALLOWED:
                 continue
             peer_cell = cell_index[(operation.id, persona.id)]
             owner_cell = cell_index.get((operation.id, owner.id))
+            owner_allowed = verdicts.get((operation.id, owner.id)) == ALLOWED
+            match = compare_content(peer_cell, owner_cell)
+            if owner_allowed and match == CONTENT_DIFFERENT:
+                withheld.append(
+                    WithheldCandidate(
+                        rule="horizontal_idor",
+                        operation_id=operation.id,
+                        persona_id=persona.id,
+                        reason=(
+                            f"the peer's body differs from the owner {owner.id}'s body, so "
+                            "the peer was served a different object; confirm the object id "
+                            "before treating this as IDOR"
+                        ),
+                    )
+                )
+                continue
+
             evidence = [
-                f"peer {persona.id} (role {persona.role}) read the owner's object: "
+                f"peer {persona.id} (role {persona.role}) read a same-role object: "
                 f"{_describe(peer_cell)}"
             ]
             if owner_cell is not None:
                 evidence.append(f"owner {owner.id} reads the same object: {_describe(owner_cell)}")
+                evidence.append(
+                    _content_sentence(f"peer {persona.id}", match, f"owner {owner.id}'s view")
+                )
+            else:
+                evidence.append(
+                    "no owner observation was recorded, so the content comparison is unknown"
+                )
             candidates.append(
                 MatrixCandidate(
                     rule="horizontal_idor",
@@ -432,10 +698,11 @@ def _horizontal_idor_candidates(
                         "path": operation.path,
                         "owner": owner.id,
                         "owner_verdict": verdicts.get((operation.id, owner.id)),
+                        "content_match": match,
                     },
                 )
             )
-    return candidates
+    return candidates, withheld
 
 
 def _vertical_escalation_candidates(
@@ -443,8 +710,9 @@ def _vertical_escalation_candidates(
     personas: Sequence[MatrixPersona],
     cell_index: Mapping[tuple[str, str], MatrixCell],
     verdicts: Mapping[tuple[str, str], str],
-) -> list[MatrixCandidate]:
+) -> tuple[list[MatrixCandidate], list[WithheldCandidate]]:
     candidates: list[MatrixCandidate] = []
+    withheld: list[WithheldCandidate] = []
     for operation in operations:
         if not operation.allowed_roles:
             continue
@@ -461,6 +729,51 @@ def _vertical_escalation_candidates(
             if verdicts.get((operation.id, persona.id)) != ALLOWED:
                 continue
             cell = cell_index[(operation.id, persona.id)]
+            baseline_persona, baseline_cell = _authorized_baseline(
+                operation,
+                personas,
+                cell_index,
+                verdicts,
+                exclude=persona.id,
+                predicate=lambda other, required=required: (role_rank(other.role) or 0) >= required,
+            )
+            match = compare_content(cell, baseline_cell)
+            if baseline_persona is not None and match == CONTENT_DIFFERENT:
+                withheld.append(
+                    WithheldCandidate(
+                        rule="vertical_escalation",
+                        operation_id=operation.id,
+                        persona_id=persona.id,
+                        reason=(
+                            f"the body differs from the authorized caller "
+                            f"{baseline_persona.id}'s body, so the lower role was not "
+                            "served the restricted document"
+                        ),
+                    )
+                )
+                continue
+
+            evidence = [_describe(cell)]
+            counterevidence: tuple[str, ...]
+            if baseline_persona is not None:
+                evidence.append(
+                    _content_sentence(
+                        f"{persona.id}",
+                        match,
+                        f"authorized caller {baseline_persona.id}'s view",
+                    )
+                )
+                counterevidence = (
+                    "the role names may not map to the target's real privilege tiers; "
+                    "confirm the intended audience before treating this as escalation",
+                )
+            else:
+                counterevidence = (
+                    "no authorized caller was observed to be allowed, so this rests on "
+                    "status alone; confirm which role is meant to reach this operation",
+                    "the role names may not map to the target's real privilege tiers; "
+                    "confirm the intended audience before treating this as escalation",
+                )
             candidates.append(
                 MatrixCandidate(
                     rule="vertical_escalation",
@@ -471,19 +784,18 @@ def _vertical_escalation_candidates(
                         f"{operation.path}, restricted to roles "
                         f"{', '.join(operation.allowed_roles)}"
                     ),
-                    evidence=(_describe(cell),),
-                    counterevidence=(
-                        "the role names may not map to the target's real privilege tiers; "
-                        "confirm the intended audience before treating this as escalation",
-                    ),
+                    evidence=tuple(evidence),
+                    counterevidence=counterevidence,
                     details={
                         "method": operation.method,
                         "path": operation.path,
                         "allowed_roles": list(operation.allowed_roles),
+                        "content_match": match,
+                        "baseline_persona": baseline_persona.id if baseline_persona else None,
                     },
                 )
             )
-    return candidates
+    return candidates, withheld
 
 
 def _method_asymmetry_candidates(
@@ -491,8 +803,9 @@ def _method_asymmetry_candidates(
     personas: Sequence[MatrixPersona],
     cell_index: Mapping[tuple[str, str], MatrixCell],
     verdicts: Mapping[tuple[str, str], str],
-) -> list[MatrixCandidate]:
+) -> tuple[list[MatrixCandidate], list[WithheldCandidate]]:
     candidates: list[MatrixCandidate] = []
+    withheld: list[WithheldCandidate] = []
     grouped: dict[str, list[MatrixOperation]] = {}
     for operation in operations:
         grouped.setdefault(operation.path, []).append(operation)
@@ -513,6 +826,10 @@ def _method_asymmetry_candidates(
                 f"{persona.id} was denied the read on {path}: {_describe(read_cell)}",
                 f"{persona.id} was allowed the write on {path}: {_describe(write_cell)}",
             ]
+            if write_cell.content_digest:
+                evidence.append(
+                    f"the write response carried content (digest {write_cell.content_digest})"
+                )
             candidates.append(
                 MatrixCandidate(
                     rule="method_asymmetry",
@@ -533,10 +850,11 @@ def _method_asymmetry_candidates(
                         "write_operation": allowed_writes[0].id,
                         "read_method": denied_reads[0].method,
                         "write_method": allowed_writes[0].method,
+                        "write_content_digest": write_cell.content_digest,
                     },
                 )
             )
-    return candidates
+    return candidates, withheld
 
 
 def matrix_to_dict(
@@ -544,6 +862,7 @@ def matrix_to_dict(
     personas: Sequence[MatrixPersona],
     cells: Sequence[MatrixCell],
     candidates: Sequence[MatrixCandidate],
+    withheld: Sequence[WithheldCandidate] = (),
 ) -> dict[str, Any]:
     """Serialize the whole matrix (cells included) for the tool response."""
     verdicts = [verdict_for_cell(cell) for cell in cells]
@@ -555,6 +874,8 @@ def matrix_to_dict(
             "verdict": verdict,
             "body_len": cell.body_len,
             "body_sample": cell.body_sample,
+            "content_digest": cell.content_digest,
+            "content_structure": sorted(cell.content_shape.splitlines()),
             "error": cell.error,
         }
         for cell, verdict in zip(cells, verdicts, strict=True)
@@ -591,6 +912,17 @@ def matrix_to_dict(
             }
             for candidate in candidates
         ],
+        # Status-only matches the content diff rejected. They stay visible so
+        # "no candidate" is never mistaken for "no such probe ran".
+        "withheld": [
+            {
+                "rule": item.rule,
+                "operation_id": item.operation_id,
+                "persona_id": item.persona_id,
+                "reason": item.reason,
+            }
+            for item in withheld
+        ],
         "counts": {
             "operations": len(operations),
             "personas": len(personas),
@@ -601,6 +933,7 @@ def matrix_to_dict(
             "redirect": sum(1 for v in verdicts if v == REDIRECT),
             "inconclusive": sum(1 for v in verdicts if v == INCONCLUSIVE),
             "candidates": len(candidates),
+            "withheld": len(withheld),
         },
     }
 
@@ -678,18 +1011,24 @@ _RUNNER_OUT_PATH = "/workspace/.halo-auth-matrix-out.json"
 async def run_matrix_in_session(
     session: BaseSandboxSession,
     plan: Sequence[tuple[str, str, HttpRequest]],
+    *,
+    timeout: float = DEFAULT_TIMEOUT_S,
 ) -> list[HttpResponse]:
     """Replay ``plan`` inside the sandbox and return the observed responses.
 
     Targets that only answer from inside the container network need this
-    transport; the probe order is preserved.
+    transport; the probe order is preserved. Every request carries its own
+    timeout and the runner process as a whole is bounded, so a stalled target
+    cannot hold the sandbox open.
     """
+    per_request_timeout = clamp_timeout(timeout)
     items = [
         {
             "method": request.method,
             "url": request.url,
             "headers": dict(request.headers),
             "body": request.body,
+            "timeout": per_request_timeout,
         }
         for _operation_id, _persona_id, request in plan
     ]
@@ -706,13 +1045,15 @@ async def run_matrix_in_session(
         _RUNNER_SCRIPT_PATH,
         _RUNNER_PLAN_PATH,
         _RUNNER_OUT_PATH,
-        timeout=300,
+        timeout=_exec_timeout(len(items), per_request_timeout),
     )
     if not result.ok():
         stderr = result.stderr.decode("utf-8", errors="replace")[:200]
         raise RuntimeError(f"auth matrix runner failed (exit {result.exit_code}): {stderr}")
     raw = await session.read(Path(_RUNNER_OUT_PATH))
     payload = json.loads(raw.read().decode("utf-8"))
+    if not isinstance(payload, list):
+        raise TypeError("auth matrix runner returned a non-list payload")
     return [
         HttpResponse(
             status=item.get("status"),
@@ -721,4 +1062,11 @@ async def run_matrix_in_session(
             location=item.get("location"),
         )
         for item in payload
+        if isinstance(item, dict)
     ]
+
+
+def _exec_timeout(count: int, per_request: float) -> int:
+    """Bound the runner process: one timeout per probe plus startup slack."""
+    budget = count * (per_request + 1.0) + 30.0
+    return int(min(budget, MAX_SANDBOX_EXEC_S))

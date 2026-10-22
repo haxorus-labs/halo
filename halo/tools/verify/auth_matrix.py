@@ -13,14 +13,21 @@ from typing import Any
 
 from agents import RunContextWrapper, function_tool
 
-from halo.verify.http_sender import HttpxSender, send_sequential
+from halo.verify.http_sender import (
+    DEFAULT_TIMEOUT_S,
+    MAX_WALL_CLOCK_S,
+    HttpxSender,
+    clamp_timeout,
+    is_http_url,
+    send_sequential,
+)
 from halo.verify.matrix import (
     MAX_MATRIX_CELLS,
     MatrixOperation,
     MatrixPersona,
     build_requests,
     cells_from_responses,
-    compute_candidates,
+    compute_differentials,
     ensure_anon_persona,
     matrix_to_dict,
     operation_from_dict,
@@ -30,8 +37,6 @@ from halo.verify.matrix import (
 
 
 logger = logging.getLogger(__name__)
-
-DEFAULT_TIMEOUT_S = 15.0
 
 
 def _ctx_session(ctx: RunContextWrapper) -> Any | None:
@@ -78,18 +83,25 @@ async def _auth_matrix_impl(
         return parsed
     parsed_operations, parsed_personas = parsed
 
+    request_timeout = clamp_timeout(timeout)
     plan = build_requests(parsed_operations, parsed_personas, base_url)
+    if plan and not all(is_http_url(request.url) for _op, _p, request in plan):
+        return {"error": "base_url must be an absolute http:// or https:// URL"}
 
     try:
         if transport == "sandbox":
             session = _ctx_session(ctx)
             if session is None:
                 return {"error": "sandbox transport requested but no sandbox session is available"}
-            responses = await run_matrix_in_session(session, plan)
+            responses = await run_matrix_in_session(session, plan, timeout=request_timeout)
         else:
-            sender = HttpxSender(timeout=timeout)
+            sender = HttpxSender(timeout=request_timeout)
             try:
-                responses = await send_sequential(sender, [request for _op, _p, request in plan])
+                responses = await send_sequential(
+                    sender,
+                    [request for _op, _p, request in plan],
+                    budget_s=MAX_WALL_CLOCK_S,
+                )
             finally:
                 await sender.aclose()
     except Exception as exc:
@@ -97,8 +109,8 @@ async def _auth_matrix_impl(
         return {"error": f"auth matrix run failed: {exc}"}
 
     cells = cells_from_responses(plan, responses)
-    candidates = compute_candidates(parsed_operations, parsed_personas, cells)
-    return matrix_to_dict(parsed_operations, parsed_personas, cells, candidates)
+    candidates, withheld = compute_differentials(parsed_operations, parsed_personas, cells)
+    return matrix_to_dict(parsed_operations, parsed_personas, cells, candidates, withheld)
 
 
 @function_tool(timeout=900, strict_mode=False)
@@ -143,7 +155,11 @@ async def auth_matrix(
     The result contains every cell (including the ``inconclusive`` ones, which
     are kept rather than dropped) plus advisory candidates. Each candidate
     carries the evidence that produced it and the counterevidence that could
-    explain it away. The tool never files findings itself.
+    explain it away. Differential rules compare response *content and
+    structure* against a baseline observation, not just status codes; a
+    status-only match whose body proves the probe got a different document is
+    reported under ``withheld`` with the reason instead of becoming a
+    candidate. The tool never files findings itself.
 
     Args:
         base_url: Target base URL (e.g. ``http://localhost:3000``).
