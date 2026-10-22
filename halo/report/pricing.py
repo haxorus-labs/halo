@@ -1,4 +1,12 @@
-"""LiteLLM model-name resolution for local cost estimates."""
+"""LiteLLM model-name resolution for local cost estimates.
+
+A cost estimate must never cost more than it saves, so this module resolves a
+model name against LiteLLM's *local* cost map only. In particular it must never
+hand a name to LiteLLM's provider machinery for a provider that authenticates
+interactively: ``completion_cost`` resolves the provider, and for
+``github_copilot/*`` that resolution starts a device-code OAuth login which
+polls until a human approves it.
+"""
 
 from __future__ import annotations
 
@@ -6,38 +14,42 @@ from functools import lru_cache
 from typing import Any, cast
 
 
+#: Providers whose ``get_api_key()`` opens an interactive OAuth device flow.
+#: Estimation runs on the event loop during an unattended scan, so a name for
+#: one of these is not resolvable: the provider-reported cost (when there is
+#: one) is the only safe source.
+INTERACTIVE_AUTH_PROVIDERS = frozenset({"github_copilot", "chatgpt"})
+
+
+def _provider_of(model: str) -> str:
+    """The leading provider segment of ``model``, or ``""``."""
+    return model.split("/", 1)[0].strip().lower() if "/" in model else ""
+
+
+def needs_interactive_auth(model: str) -> bool:
+    """True when pricing ``model`` would start an interactive login."""
+    return _provider_of(model) in INTERACTIVE_AUTH_PROVIDERS
+
+
 def cost_map_provider(model: str) -> str | None:
-    """Return the provider segment that keeps ``model`` on its cost-map entry.
+    """Provider segment of a resolved cost-map key, when it has one.
 
-    ``litellm.completion_cost`` infers a provider with ``get_llm_provider`` when
-    the caller supplies none, and that inference can pick a provider which
-    authenticates while resolving its config: ``claude-sonnet-4.6`` is priced
-    only under ``github_copilot/``, and resolving that provider starts a GitHub
-    device login and polls it with ``time.sleep``. A cost estimate is a local
-    read of the cost map, so the provider is handed to LiteLLM explicitly
-    instead of being inferred.
+    ``litellm.completion_cost`` infers a provider with ``get_llm_provider``
+    when the caller supplies none. Resolution is already restricted to local
+    entries that never authenticate interactively, but passing the provider
+    keeps the estimate on exactly the entry that was resolved instead of
+    letting LiteLLM derive a possibly different one.
     """
-    if "/" in model:
-        return model.split("/", 1)[0]
-    try:
-        import litellm
-
-        entry = cast(
-            "dict[str, dict[str, Any]]",
-            getattr(litellm, "model_cost"),  # noqa: B009
-        ).get(model)
-    except Exception:  # noqa: BLE001
-        return None
-    if isinstance(entry, dict):
-        provider = entry.get("litellm_provider")
-        if isinstance(provider, str) and provider:
-            return provider
-    return None
+    return _provider_of(model) or None
 
 
 @lru_cache(maxsize=512)
 def resolve_litellm_model(model: str) -> str | None:
-    """Return a provider-qualified model name that LiteLLM can price."""
+    """Return a provider-qualified model name that LiteLLM can price.
+
+    ``None`` means "no local price is known"; callers then fall back to the
+    provider-reported cost instead of guessing.
+    """
     try:
         import litellm
 
@@ -56,16 +68,38 @@ def resolve_litellm_model(model: str) -> str | None:
         bare_entry = model_cost.get(normalized)
         if "/" not in normalized and isinstance(bare_entry, dict):
             provider = bare_entry.get("litellm_provider")
-            if isinstance(provider, str) and provider:
+            if isinstance(provider, str) and provider and not needs_interactive_auth(provider):
                 return f"{provider}/{normalized}"
         if "/" in normalized and isinstance(bare_entry, dict):
-            return normalized
+            return None if needs_interactive_auth(normalized) else normalized
+
+        # A suffix match may only stay inside the provider the caller named.
+        # Matching across providers is how ``openrouter/anthropic/claude-...``
+        # used to resolve to ``github_copilot/claude-...``: the first key by
+        # sort order, at another vendor's price.
+        providers = {
+            str(getattr(entry, "value", entry)).lower()
+            for entry in getattr(litellm, "provider_list", ())
+        }
+        family = _provider_of(normalized)
+        if (
+            family
+            and family not in providers
+            and not any(str(key).startswith(f"{family}/") for key in model_cost)
+        ):
+            family = ""
 
         names = [normalized]
         if "/" in normalized:
             names.append(normalized.rsplit("/", 1)[-1])
         for name in names:
-            matches = sorted(key for key in model_cost if key.endswith(f"/{name}"))
+            matches = [
+                key
+                for key in sorted(str(entry) for entry in model_cost)
+                if key.endswith(f"/{name}")
+                and (not family or key.startswith(f"{family}/"))
+                and not needs_interactive_auth(key)
+            ]
             if not matches:
                 continue
             prices = {

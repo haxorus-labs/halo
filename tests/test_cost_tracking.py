@@ -401,25 +401,30 @@ def test_openrouter_request_carries_agent_session_id() -> None:
 def test_cost_estimate_never_infers_a_provider() -> None:
     """Estimating cost stays on the cost map; inference can start a login.
 
-    LiteLLM prices ``claude-sonnet-4.6`` only under ``github_copilot/``, and
-    resolving that provider authenticates: it prints a device code and polls
-    GitHub with ``time.sleep``. A cost estimate must never take that path, so
-    the callback fails here if LiteLLM has to infer the provider itself.
+    ``completion_cost`` resolves the provider when the caller supplies none,
+    and for some providers that resolution authenticates interactively. The
+    callback therefore has to hand LiteLLM the provider of the entry it
+    already resolved; if it does not, this patched inference raises.
     """
     report_state = MagicMock()
-    response = {
-        "model": "github_copilot/claude-sonnet-4.6",
-        "usage": {"prompt_tokens": 1000, "completion_tokens": 200, "total_tokens": 1200},
-    }
+    response = {"usage": {"prompt_tokens": 1000, "completion_tokens": 200, "total_tokens": 1200}}
 
     with (
         patch("halo.report.state.get_global_report_state", return_value=report_state),
         patch("litellm.get_llm_provider", side_effect=AssertionError("provider inferred")),
     ):
-        litellm_cost_callback(
-            {"model": "openrouter/anthropic/claude-sonnet-4.6"},
-            response,
-        )
+        litellm_cost_callback({"model": "openai/gpt-4o-mini"}, response)
 
     report_state.record_observed_llm_cost.assert_called_once()
     assert report_state.record_observed_llm_cost.call_args.args[0] > 0
+
+
+def test_cost_estimate_never_prices_a_provider_that_needs_a_login() -> None:
+    """The Copilot vector resolves to no local price, so nothing is recorded."""
+    report_state = MagicMock()
+    response = {"usage": {"prompt_tokens": 1000, "completion_tokens": 200, "total_tokens": 1200}}
+
+    with patch("halo.report.state.get_global_report_state", return_value=report_state):
+        litellm_cost_callback({"model": "github_copilot/claude-sonnet-4.6"}, response)
+
+    report_state.record_observed_llm_cost.assert_not_called()
